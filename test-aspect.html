@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Aspects</title>
+	<link rel="stylesheet" type="text/css" href="sr5_sheet.css" >
+    <link rel="stylesheet" type="text/css" href="bootstrap.min.css">
+	
+	<script src="bootstrap.bundle.min.js" defer=""></script>
+    <script src="math.js" ></script>
+	<script src="dakair-aspect-system.js" ></script>
+	<script src="dakair-aspect-system-ui.js" ></script>
+
+</head>
+
+<body>
+
+  <form id="globalForm">
+	<ul class="nav nav-pills" id="sheetList" role="tablist">
+	  <li class="nav-item" role="presentation">
+		<button class="nav-link active" id="displayed-sheet" data-bs-target="#sheeet-player-tab-pane" type="button">Player</button>
+	  </li>
+	  <li class="nav-item dropdown">
+		<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Actions</a>
+		<ul class="dropdown-menu">
+		  <li><a class="dropdown-item" href="#" id="action-reset-data">Reset</a></li>
+		  <li><a class="dropdown-item" href="#" id="action-save-data">Save</a></li>
+		  <li><hr class="dropdown-divider"></li>
+		  <li><a class="dropdown-item" href="#" id="action-load-data">Load</a></li>
+		</ul>
+	  </li>
+	</ul>
+
+	
+	<div class="row" >
+		<div class="col">
+			<label>name</label>
+			<input id="character_name" type="text" data-ref-key="char_name" class="field-data"  required >
+		</div>
+		<div class="col">
+			<label>level</label>
+			<input type="text"  data-ref-key="char_level" data-default-value="1" class="field-data" >
+		</div>
+		<div class="col">
+			<label>proficiency bonus</label>
+			<input type="text"  data-ref-key="prof_bonus" data-formula="2 + floor( (char_level - 1) / 4 )" class="field-data">
+		</div>
+	</div>
+	<div class="row">
+		
+		<div class="col">
+			<label>str</label>
+			<input type="text" data-ref-key="attr_str" data-default-value="12" class="field-data" >
+		</div>
+		<div class="col">
+			<label>str modifier</label>
+			<input type="text"  data-ref-key="attr_str_mod" data-formula="floor((attr_str - 10) / 2)" class="field-data" >
+		</div>
+		<div class="col">
+			<label>dex</label>
+			<input type="text"  data-ref-key="attr_dex" data-default-value="14" class="field-data" >
+		</div>
+		<div class="col">
+			<label>dex modifier</label>
+			<input type="text"  data-ref-key="attr_dex_mod" data-formula="floor((attr_dex - 10) / 2)" class="field-data" >
+		</div>
+	</div>
+	<div class="row">
+		<div class="col">
+			<label>dynamic attrib</label>
+			<input type="text" data-ref-key="attr_dynamic" class="field-data" >
+		</div>
+		<div class="col">
+			<label>value from dynamic</label>
+			<input type="text"  data-ref-key="attr_dynamic_value" data-reference="attr_dynamic" class="field-data" >
+		</div>
+		<div class="col">
+			<label>Str o Hit bonus</label>
+			<input type="text" data-ref-key="bonus_tohit" data-formula="prof_bonus + attr_str_mod" class="field-data" >
+		</div>
+	</div>
+	
+	<template data-line-name="gear" class="line-definition">
+		<div class="row" >
+			<div class="col">
+				<label>Item</label>
+				<input type="text" data-ref-key="item" class="field-line-data" >
+			</div>
+			<div class="col">
+				<label>Line - weight</label>
+				<input type="text" data-ref-key="weight" class="field-line-data" value="1">
+			</div>
+			<div class="col">
+				<label>Line - qty</label>
+				<input type="text" data-ref-key="qty" data-value-kind="int" class="field-line-data" value="1">
+			</div>
+			<div class="col">
+				<label>Line - calc weight</label>
+				<input type="text" data-ref-key="weight_calc" data-formula="gear_qty[line-id] * gear_weight[line-id]" class="field-line-data" >
+			</div>
+			<div class="col">
+				<button type="button" class="line-button-delete">Delete</button>
+			</div>
+		</div>
+	</template>
+	<template data-line-name="skill" class="line-definition">
+		<div class="row" >
+			<div class="col">
+				<label>Skill name</label>
+				<input type="text" data-ref-key="name" class="field-line-data" >
+			</div>
+			<div class="col">
+				<label>Linked Attribute</label>
+				<select data-ref-key="linked_attribute" class="field-line-data">
+					<option value="attr_str_mod">Strength</option>
+					<option value="attr_dex_mod">Dexterity</option>
+				</select>
+				<input type="hidden" data-ref-key="linked_value" data-reference="skill_linked_attribute[line-id]" class="field-line-data">
+			</div>
+			<div class="col">
+				<label>Calculated</label>
+				<input type="text" data-ref-key="skill_calc" data-formula="prof_bonus + skill_linked_value[line-id]" class="field-line-data" >
+			</div>
+			<div class="col">
+				<button type="button" class="line-button-delete">Delete</button>
+			</div>
+		</div>
+	</template>
+
+	<div class="row">
+		<div class="col">
+			<h3>Gears</h3>
+			<button type="button" data-line-name="gear" class="line-button-add">Add Gear</button>
+			<div class="line-container" data-line-name="gear" >
+
+			</div>
+		</div>
+		<div class="col">
+			<h3>Skills</h3>
+			<button type="button" data-line-name="skill" class="line-button-add">Add Skill</button>
+			<div class="line-container" data-line-name="skill" >
+
+			</div>
+		</div>
+	</div>
+
+	<div class="row">
+		<div class="col">
+			<label>Total weight</label>
+			<input type="text" data-ref-key="total_weight" data-formula="lineAggregate(gear, gear_weight_calc)" class="field-data" >
+		</div>
+		<div class="col">
+			<label>Total quantity</label>
+			<input type="text" data-ref-key="total_quantity" data-value-kind="int" data-formula="lineAggregate(gear, gear_qty)" class="field-data" >
+		</div>
+		<div class="col">
+			<label>line count</label>
+			<input type="text" data-ref-key="gear_line_count" data-formula="lineAggregate(gear, gear_weight_calc, 'count')" class="field-data" >
+		</div>
+		<div class="col">
+			<label>item weighting 5</label>
+			<input type="text" data-ref-key="find_gear_item_5" data-formula="lineFirst(gear, gear_weight, 5).gear_item" class="field-data" >
+		</div>
+		<div class="col">
+			<label>lighter item</label>
+			<input type="text" data-ref-key="find_lighter_item" data-formula="lineFirst(gear, gear_weight, lineAggregate(gear, gear_weight_calc, 'min')).gear_item" class="field-data" >
+		</div>
+	</div>
+		
+  </form>
+  
+  <script >
+	var dasHandler = new DasUiHandler();
+	dasHandler.initialize();
+
+	function doContextAction(actionMethod) {
+		let dataNameElement = document.getElementById('character_name');
+		let form = dataNameElement.form;
+		if (!form.checkValidity()) {
+			form.reportValidity();
+		} else {
+			actionMethod(dataNameElement.value);
+		}
+	}
+
+	document.getElementById('action-reset-data').addEventListener('click', () => { dasHandler.reset(); });
+	document.getElementById('action-load-data').addEventListener('click', () => { doContextAction((name) => { dasHandler.load(name); } ); } );
+	document.getElementById('action-save-data').addEventListener('click', () => { doContextAction((name) => { dasHandler.save(name); } ); } );
+  </script>
+</body>
+</html>
