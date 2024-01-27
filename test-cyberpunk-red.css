@@ -1,0 +1,174 @@
+
+.rotate-header th {
+    writing-mode: vertical-lr;
+/*    transform: rotate(90deg); */
+    height: 70px;
+    width: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+ }
+
+ .rotate-header th label {
+    width:100%;
+    height:100%;
+    background-color: rgb(207, 207, 207);
+ }
+
+ .rotate-header td {
+    text-align: center;
+ }
+
+.one-group:not(.active) {
+    display: none;
+}
+
+.one-group.active {
+    width:200px; 
+    height: 200px;
+    position: absolute; 
+    top:100px;
+    left:50px;
+    padding: 5px;
+    z-index:100; 
+    background-color: gray;
+}
+
+.hr {
+    width: 100%; 
+    height: 15px; 
+    border-bottom: 1px solid black; 
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.hr span {
+    background-color: #F3F5F6; 
+    padding: 0 10px;
+    margin-bottom: 25px;
+}
+
+table.stat-editor th {
+    background-color: red;
+    color: white;
+}
+table.stat-editor tr:nth-child(even) {
+    background-color: whitesmoke;
+}
+table.stat-editor tr:nth-child(odd) {
+    background-color: gray;
+}
+
+#skill-editor-header {
+    background-color: red;
+    color:white;
+}
+
+.tab-pane {
+    text-align: center;
+}
+.tab-pane table {
+    margin: 0 auto;
+    text-align: left;
+}
+
+.armor-penalty {
+    border: none;
+    background-position: left;
+    background-size:cover;
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    background-image: url(imgs/shield.svg) ;
+    background-repeat: no-repeat;
+}
+.armor-penalty span {
+    top:0;
+    left:80%;
+}
+
+.btn-close-x {
+    border: none;
+    background-color: white;
+    
+}
+div.svg {
+    width: 20px;
+    height: 20px;
+    background-color: red;
+    -webkit-mask: url(imgs/x-octagon-fill.svg) no-repeat center / contain;
+    mask: url(imgs/x-octagon-fill.svg) no-repeat center / contain;
+
+   
+    /*content: url(imgs/x-octagon-fill.svg);*/
+}
+
+/*
+.btn-close-x {
+    border: none;
+    background-position: left;
+    background-size:cover;
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    fill: red;
+    stroke: aqua;
+    stroke-width: 2px;
+    mask-image: url(imgs/x-octagon-fill.svg);
+    background-repeat: no-repeat; 
+    background-image: url(imgs/x-octagon-fill.svg);
+    
+    background-color: red;
+    -webkit-mask-image: url(imgs/x-octagon-fill.svg);
+    mask-image: url(imgs/x-octagon-fill.svg);
+    mask-size: cover; 
+    mask-mode: alpha;
+    mask-position: 50% 50%;
+    
+    
+} */
+
+button.minus {
+    background-image: url(imgs/btn-minus-square.png) ;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover; 
+    border: var(--bs-btn-border-width) solid rbg(201,41,60);
+}
+button.minus:hover {
+    background-image: url(imgs/btn-minus-square-hover.png);
+    border: var(--bs-btn-border-width) solid rbg(255,0,0);
+}
+button.plus {
+    background-image: url(imgs/btn-plus-square.png) ;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover; 
+    border: var(--bs-btn-border-width) solid rbg(158,158,158);
+}
+button.plus:hover {
+    background-image: url(imgs/btn-plus-square-hover.png);
+    border: var(--bs-btn-border-width) solid rbg(96,96,96);
+}
+
+/*  BOOTSTRAP --- MY FIXES */
+.form-floating.my-fix label {
+	margin-left: 5px !important;
+}
+
+input.form-control {
+	padding-top: 1px;
+	padding-bottom: 1px;
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+/* ALREADY IN PLACE */
+
+body {
+    background-color: var(--ts-background-primary);
+    color: var(--ts-color-primary);
+    font-family: 'OptimusPrinceps', sans-serif;
+    width: 98%;
+    margin: 0 auto 0 auto;
+    padding: 10px;
+}

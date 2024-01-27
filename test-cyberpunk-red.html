@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Aspects</title>
+	<link rel="stylesheet" type="text/css" href="test-cyberpunk-red.css" >
+    <link rel="stylesheet" type="text/css" href="bootstrap.min.css">
+	
+	<script src="bootstrap.bundle.min.js" defer=""></script>
+  <script src="math.js" ></script>
+	<script src="dakair-helper.js" ></script>
+	<script src="dakair-aspect-system.js" ></script>
+	<script src="dakair-aspect-system-ui.js" ></script>
+
+</head>
+
+<body>
+
+  <form id="globalForm">
+	<ul class="nav nav-pills" id="sheetList" role="tablist">
+	  <!--
+		<li id="sheet-list-sibling" class="nav-item" role="presentation">
+			<button class="nav-link active" id="player-sheet" data-bs-target="#sheeet-player-tab-pane" type="button">Player</button>
+	  </li>
+		-->
+		
+	  <li id="sheet-action-dropdown" class="nav-item dropdown">
+			<!-- Sheet name for tab navigation are inserted here -->
+			<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Actions</a>
+			<ul class="dropdown-menu">
+				<li><div class="dropdown-item"><label for="action-add-sheet-name">New Sheet name</label><br /><input type="text" id="action-add-sheet-name" value="new1"></div></li>
+				<li><a class="dropdown-item" href="#" id="action-add-sheet" onclick="userAddSheet();">Add</a></li>
+				<li><hr class="dropdown-divider"></li>
+				<li><a class="dropdown-item" href="#" id="action-reset-data">Reset</a></li>
+				<li><a class="dropdown-item" href="#" id="action-save-data">Save</a></li>
+				<li><hr class="dropdown-divider"></li>
+				<li><a class="dropdown-item" href="#" id="action-load-data">Load</a></li>
+			</ul>
+	  </li>
+	</ul>
+
+	<div id="sheet-holder" class="tab-content">
+		<!-- Sheet content are inserted here -->
+	</div>
+	<template id="sheet-nav" data-template-parameters="['{sheet-name}','{other-classes}','{sheet-id}']">
+		<li role="presentation" data-sheet-index="{sheet-id}" class="nav-item">
+			<button type="button" class="nav-link {other-classes}" data-bs-target="#sheet-{sheet-name}" data-bs-toggle="tab">{sheet-name}</button>
+		</li>
+	</template>
+
+	<template id="skill-template" data-template-parameters="['{skill-name}','{skill-attribute}','{skill-name-ref}', '{skill-attribute-ref}']">
+		<div class="skill-div field-display" data-sort-group="{skill-attribute}" data-sort-name="{skill-name}" data-rank-value="0" 
+			data-ref-key="skill_{skill-name-ref}_rank" data-value-attribute="data-rank-value">
+			<div class="row skill-display" >
+				<div class="col-1"><h4><span data-ref-key="skill_{skill-name-ref}_total" class="field-display badge bg-danger">0</span></h4></div>
+				<div class="col-4">
+					<span>{skill-name}</span>
+				</div>
+				<div class="col-2 skill-stat-name">
+					<span class="text-muted ">{skill-attribute}</span>
+				</div>
+			</div>
+
+			<div class="row skill-editor d-none">
+				<div class="col-3">{skill-name}</div>
+				<div class="col-3">
+					<div class="input-group input-group-sm">
+						<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+						<input type="text" data-ref-key="skill_{skill-name-ref}_rank" class="field-data form-control" value="0"> 
+						<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+					</div>
+				</div>
+				<div class="col-3">
+					<div class="input-group input-group-sm">
+						<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+						<input type="text" data-ref-key="skill_{skill-name-ref}_mod" class="field-data form-control" value="0">
+						<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+					</div>
+				</div>
+				<div class="col-3">
+					<div class="input-group input-group-sm">
+						<span class="input-group-text"><span>{skill-attribute-ref}</span><span data-ref-key="stat_{skill-attribute-ref}_total" class="notanymore-field-display"></span></span>
+						<input type="text" data-ref-key="skill_{skill-name-ref}_total" data-formula="skill_{skill-name-ref}_rank + stat_{skill-attribute-ref}_total + skill_{skill-name-ref}_mod" class="field-data form-control" value="0">
+					</div>
+				</div>
+			</div>
+		</div>
+	</template>
+
+	<template id="skill-separator" data-template-parameters="['{separator-name}']">
+		<div class="hr skill-separator"><span>{separator-name}</span></div>
+	</template>
+
+	<template id="stat_editor" data-template-parameters="['{long-name}', '{ref-name}', '{sheet-id}']">
+		<tr id="stat-{ref-name}{sheet-id}">
+			<td>{long-name} (<span class="text-muted">{ref-name}</span>)</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus " type="button"  onclick="addOrRemove(this)"></button>
+					<input type="text" data-ref-key="stat_{ref-name}_create" class="field-data form-control" value="4">
+					<button class="btn plus " type="button"  onclick="addOrRemove(this)"></button>
+				</div>
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus " type="button"  onclick="addOrRemove(this)"></button>
+					<input type="text" data-ref-key="stat_{ref-name}_mod" class="field-data form-control" value="0">
+					<button class="btn plus " type="button"  onclick="addOrRemove(this)"></button>
+				</div>				
+			</td>
+			<td>
+				<input type="text" data-ref-key="stat_{ref-name}_total" data-formula="stat_{ref-name}_create + stat_{ref-name}_mod" class="field-data form-control form-control-sm">
+			</td>
+		</tr>
+	</template>
+
+	<!-- Dex, Ref and move affected by armor penalty -->
+	<template id="stat_editor_armor" data-template-parameters="['{long-name}', '{ref-name}', '{sheet-id}']">
+		<tr id="stat-{ref-name}{sheet-id}">
+			<td>{long-name} (<span class="text-muted">{ref-name}</span>)
+				<div class="armor-penalty position-relative" >
+					<span data-ref-key="effective_armor_penalty" class="position-absolute field-display badge rounded-pill bg-danger"></span>
+				</div>
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+					<input type="text" data-ref-key="stat_{ref-name}_create" class="field-data form-control" value="4">
+					<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+				</div>
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+					<input type="text" data-ref-key="stat_{ref-name}_mod" class="field-data form-control" value="0">
+					<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+				</div>				
+			</td>
+			<td>
+				<input type="text" data-ref-key="stat_{ref-name}_total" data-formula="max(0, stat_{ref-name}_create + stat_{ref-name}_mod + min(0,effective_armor_penalty))" class="field-data form-control form-control-sm">
+			</td>
+		</tr>
+	</template>
+	
+	<template id="stat_editor_luck" data-template-parameters="['{sheet-id}']">
+		<tr id="stat-luck{sheet-id}">
+			<td>Luck (<span class="text-muted">luck</span>)</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+					<input type="text" data-ref-key="stat_luck_create" class="field-data form-control form-control-sm" value="4">
+					<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+				</div>
+				
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button"  onclick="addOrRemove(this)"></button>
+					<span class="input-group-text"  >Used</span>
+					<input type="text" data-ref-key="stat_luck_used" class="field-data form-control " value="0">
+					<button class="btn plus" type="button"  onclick="addOrRemove(this)"></button>
+				</div>
+			</td>
+			<td>
+				<input type="text" data-ref-key="stat_luck_total" data-formula="stat_luck_create - stat_luck_used" class="field-data form-control form-control-sm">
+			</td>
+		</tr>
+	</template>
+
+	<template id="stat_editor_emp" data-template-parameters="['{sheet-id}']">
+		<tr id="stat-emp{sheet-id}">
+			<td class="col-3">Empathy (<span class="text-muted">emp</span>)</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+					<input type="text" data-ref-key="stat_emp_create" class="field-data form-control" value="4">
+					<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+				</div>
+			</td>
+			<td>
+				<input type="text" data-ref-key="stat_emp_mod" class="field-data form-control form-control-sm" value="100">
+			</td>
+			<td>
+				<input type="text" data-ref-key="stat_emp_total" data-formula="floor(stat_human_total / 10) - stat_emp_mod" class="field-data form-control form-control-sm">
+			</td>	
+		</tr>
+	</template>
+
+	<template id="stat_editor_human" data-template-parameters="['{sheet-id}']">
+		<tr id="stat-human{sheet-id}">
+			<td>Humanity (Special)</td>
+			<td>
+				<figure class="figure">
+					<input type="text" data-ref-key="stat_human_create" data-formula="stat_emp_create * 10" class="field-data form-control form-control-sm" value="40" disabled="disabled">
+					<figcaption class="figure-caption">Empathy * 10</figcaption>
+				</figure>
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button" onclick="addOrRemove(this)"></button>
+					<span class="input-group-text" >Max</span>
+					<input type="text" data-ref-key="stat_human_max" class="field-data form-control" value="100">
+					<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+				</div>
+			</td>
+			<td>
+				<div class="input-group input-group-sm">
+					<button class="btn minus" type="button" onclick="addOrRemove(this)"></button>
+					<span class="input-group-text" >Left</span>
+					<input type="text" data-ref-key="stat_human_total" class="field-data form-control">
+					<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+				</div>
+				
+			</td>
+		</tr>
+	</template>
+	
+
+	<template id="pc-sheet" data-template-parameters="['{sheet-id}', '{sheet-name}']">
+		<div class="tab-pane" data-sheet-name="{sheet-name}" id="sheet-{sheet-name}">
+			<ul class="nav nav-tabs" id="myTab{sheet-id}" role="tablist">
+				<li class="nav-item" role="presentation">
+					<button class="nav-link" id="bio-tab{sheet-id}" data-bs-target="#bio-tab-pane{sheet-id}" aria-controls="bio-tab-pane" data-bs-toggle="tab"  type="button" role="tab"  aria-selected="true">Settings</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link " id="stat-tab{sheet-id}" data-bs-target="#stat-tab-pane{sheet-id}" aria-controls="stat-tab-pane" data-bs-toggle="tab"  type="button" role="tab"  aria-selected="true">Stats</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link active" id="skill-tab{sheet-id}" data-bs-target="#skill-tab-pane{sheet-id}" aria-controls="skill-tab-pane" data-bs-toggle="tab"  type="button" role="tab"  aria-selected="true">Skills</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link " id="combat-tab{sheet-id}" data-bs-target="#combat-tab-pane{sheet-id}" aria-controls="combat-tab-pane" data-bs-toggle="tab"  type="button" role="tab"  aria-selected="true">Combat</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link " id="inventory-tab{sheet-id}" data-bs-target="#inventory-tab-pane{sheet-id}" aria-controls="inventory-tab-pane" data-bs-toggle="tab"  type="button" role="tab"  aria-selected="true">Inventory</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link " id="injury-tab{sheet-id}" data-bs-target="#injury-tab-pane{sheet-id}" aria-controls="injury-tab-pane" data-bs-toggle="tab"  type="button" role="tab" aria-selected="true">Injuries</button>
+				</li>
+			</ul>
+
+			<div id="tabs{sheet-id}" class="tab-content">
+				<div id="bio-tab-pane{sheet-id}" class="tab-pane fade">
+					<div class="row form-floating">
+						<input type="text" id="name{sheet-id}" data-ref-key="name" class="field-data form-control" aria-label="Character name">
+						<label for="name{sheet-id}">Name</label>
+					</div>
+					
+				</div>
+				<div id="stat-tab-pane{sheet-id}" class="tab-pane">
+					<div id="stat-group{sheet-id}" class="conainer-fluid border" >
+						
+						<table class="table stat-editor">
+							<thead>
+								<tr>
+									<th>Stat</th>
+									<th>Creation</th>
+									<th>Modifier</th>
+									<th>Value</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor" data-template-parameters="['Intelligence','int','{sheet-id}']"></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_armor" data-template-parameters="['Reflex','ref','{sheet-id}']"></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_armor" data-template-parameters="['Dexterity','dex','{sheet-id}']" ></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor" data-template-parameters="['Technique','tech','{sheet-id}']" ></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor" data-template-parameters="['Cool','cool','{sheet-id}']" ></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor" data-template-parameters="['Will','will','{sheet-id}']" ></tr>
+								<!-- Special editor for Luck -->
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_luck" data-template-parameters="['{sheet-id}']" ></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_armor" data-template-parameters="['Move','move','{sheet-id}']" ></tr>
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor" data-template-parameters="['Body','body','{sheet-id}']" ></tr>
+								<!-- Special editor for Empathy -->
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_emp" data-template-parameters="['{sheet-id}']" ></tr>
+								<!-- Special editor for Humanity -->
+								<tr id="APPLY-TEMPLATE" data-template-id="stat_editor_human" data-template-parameters="['{sheet-id}']" ></tr>
+							</tbody>
+						</table>
+						
+					</div>
+				</div>
+
+				<div id="skill-tab-pane{sheet-id}" class="tab-pane show active">
+					<div id="stat-section{sheet-id}" >
+						<table class="rotate-header">
+							<tr>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-int{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >INT</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-ref{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >REF</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-dex{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >DEX</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-tech{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >TECH</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-cool{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >COOL</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-will{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >WILL</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-luck{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >LUCK</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-move{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >MOVE</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-body{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >BODY</label></th>
+								<th><label class="container" data-group-target="stat-group{sheet-id}" data-element-target="stat-emp{sheet-id}" data-template-event="[['click', 'stat-editor-click']]" >EMP</label></th>
+							</tr>
+							<tr>
+								<td><span data-ref-key="stat_int_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_ref_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_dex_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_tech_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_cool_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_will_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_luck_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_move_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_body_total" class="field-display"></span></td>
+								<td><span data-ref-key="stat_emp_total" class="field-display"></span></td>
+							</tr>
+						</table>
+					</div>
+
+					<div id="skill-section{sheet-id}" class="container-fluid border">
+
+						<div class="row skill-toggles">
+							<div class="col-3">
+								<div class="form-check form-switch">
+									<input type="checkbox" id="skill-switch-grouping{sheet-id}" role="switch" class="form-check-input" 
+											data-linked-sheet-id="{sheet-id}" data-template-event="[['change', 'skill-group-toggle']]">
+									<label for="skill-switch-grouping{sheet-id}" class="form-check-label">Grouping</label>
+								</div>
+							</div>
+							<div class="col-1"></div>
+							<div class="col-3">
+								<div class="form-check form-switch">
+									<input type="checkbox" id="skill-sort-edit{sheet-id}" role="switch" class="form-check-input" 
+											data-linked-sheet-id="{sheet-id}" data-template-event="[['change', 'skill-editor-toggle']]" >
+									<label for="skill-sort-edit{sheet-id}" class="form-check-label">Editing</label>
+								</div>
+							</div>
+							<div class="col-1"></div>
+							<div class="col-3">
+								<div class="form-check form-switch">
+									<input type="checkbox" id="skill-sort-hide-zero{sheet-id}" role="switch" class="form-check-input" 
+											data-linked-sheet-id="{sheet-id}" data-template-event="[['change', 'skill-zero-toggle']]">
+									<label for="skill-sort-hide-zero{sheet-id}" class="form-check-label">Hide 0</label>
+								</div>
+							</div>
+						</div>
+
+						<div id="skill-editor-header{sheet-id}" class="d-none skill-editor">
+							<div class="row">
+								<div class="col-3"></div>
+								<div class="col-3">Rank</div>
+								<div class="col-3">Modifier</div>
+								<div class="col-3">Stat & Total</div>
+							</div>
+						</div>
+					
+					<div id="skill-list{sheet-id}" style="height: 600px;overflow-y: scroll; overflow-x:hidden; ">
+						<apply-template data-template-id="skill-template" data-template-parameters="['Accounting','Intelligence','accounting', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Acting','Cool','acting', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Air Vehicle Tech','Technique','air_vehicle_tech', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Animal Handling','Intelligence','animal_handling', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Archery','Reflexes','archery', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Athletics','Dexterity','athletics', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Autofire','Reflexes','autofire', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Basic Tech','Technique','basic_tech', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Brawling','Dexterity','brawling', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Bribery','Cool','bribery', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Bureaucracy','Intelligence','bureaucracy', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Business','Intelligence','business', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Composition','Intelligence','composition', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Conceal & reveal Object','Intelligence','conceal_reveal', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Concentration','Willpower','concentration', 'will']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Contortionist','Dexterity','contortionist', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Conversation','Empathy','conversation', 'emp']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Criminology','Intelligence','criminology', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Cryptography','Intelligence','cryptography', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Cybertech','Intelligence','cybertech', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Dance','Dexterity','dance', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Deduction','Intelligence','deduction', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Demolitions','Technique','demolitions', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Drive land vehicle','Reflexes','drive_land', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Education','Intelligence','education', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Electronics and Security Tech','Technique','electronics_security', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Endurance','Willpower','endurance', 'will']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Evasion','Dexterity','evasion', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['First Aid','Technique','first_aid', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Forgery','Technique','forgery', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Gamble','Intelligence','gamble', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Handgun','Reflexes','handgun', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Heavy weapons','Reflexes','heavy_weapon', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Human Perception','Empathy','human_perception', 'emp']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Interrogation','Cool','interrogation', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Land Vehicle Tech','Technique','land_vehicle_tech', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Language (Native)','Intelligence','lang_native', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Language (Streetslang)','Intelligence','lang_street', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Library Search','Intelligence','library_search', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Lip Reading','Intelligence','lip_reading', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Local Expert (Your home)','Intelligence','local_expert_home', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Martial arts','Dexterity','martial_arts', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Melee weapon','Dexterity','melee_weapon', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Paint, Draw, Sculpt','Technique','paint_draw_scult', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Paramedic','Technique','paramedic', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Perception','Intelligence','perception', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Persuasion','Cool','persuasion', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Photography/Film','Technique','photo_film', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Pick lock','Technique','pick_lock', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Pick pocket','Technique','pick_pocket', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Pilot Air Vehicle','Reflexes','pilot_air_vehicle', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Pilot Sea Vehicle','Reflexes','pilot_sea_vehicle', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Play instrument','Technique','play_instrument', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Resist Torture & Drugs','Willpower','resist_torture_drugs', 'will']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Riding','Reflexes','riding', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Science','Intelligence','science', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Sea Vehicle Tech','Technique','sea_vehicle_tech', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Shoulder Arms','Reflexes','shoulder_arms', 'ref']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Stealth','Dexterity','stealth', 'dex']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Streetwise','Cool','streetwise', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Tactics','Intelligence','tactics', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Tracking','Intelligence','tracking', 'int']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Trading','Cool','trading', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Wardrobe & Style','Cool','wardrobe_style', 'cool']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Weapon Tech','Technique','weapon_tech', 'tech']"></apply-template>
+						<apply-template data-template-id="skill-template" data-template-parameters="['Wilderness Survival','Intelligence','wilderness_survival', 'int']"></apply-template>
+						<div id="last-skill-element{sheet-id}">&nbsp;</div>
+					</div>
+				</div>
+
+
+
+				</div>
+				<div id="combat-tab-pane{sheet-id}" class="tab-pane fade">
+					<div class="row">
+						<input type="hidden" class="field-data" data-ref-key="hp_max" data-formula="10 + (5 * ceil( (stat_body_total + stat_will_total) /2))">
+
+						<div class="col-2">
+							<label>Health</label><br />
+							<div class="input-group input-group-sm ">
+								<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+								<input type="text" data-ref-key="hp_current" class="field-data form-control " value="10">
+								<span class="input-group-text field-data max-value" data-ref-key="on_max" data-formula="hp_max"></span>
+								<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+							</div>
+						</div>
+
+						<div class="col-2">
+							<label>Luck</label><br />
+							<div class="input-group input-group-sm">
+								<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+								<input type="text" data-ref-key="luck_remain" class="field-data form-control " value="10">
+								<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+							</div>
+						</div>
+
+
+						<div class="col-2">
+							<label>Seriously Wounded</label>
+							<input type="text" class="field-data" data-ref-key="hp_wnd_serious" data-formula="ceil(hp_max /2)">
+							<label>Death Save</label>
+							<input type="text" class="field-data" data-ref-key="death_save" data-formula="stat_body_total">
+							<label>Effective Body SP : </label>
+							<input type="text" data-ref-key="effective_armor_sp" data-formula="0 + lineAggregate(armor, armor_sp_total, 'max', [armor_position, armor_worn], ['body', 1])" class="field-data">
+							<label>Effective Head SP : </label>
+							<input type="text" data-ref-key="effective_armor_sp_head" data-formula="0 + lineAggregate(armor, armor_sp_total, 'max', [armor_position, armor_worn], ['head', 1])" class="field-data">
+							<label>Effective Armor Penalty : </label>
+							<input type="text" data-ref-key="effective_armor_penalty" data-formula="0 + lineAggregate(armor, armor_penalty, 'min', armor_worn, 1)" class="field-data">
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-2">
+							<span>Facedown</span><span>cool</span> + reputation
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-2">
+							<span>Initiative</span><span>ref</span>
+						</div>
+					</div>
+
+					<div class="row">
+						<div class="col-2">
+							<span>Evasion</span><span>dexterity</span>
+						</div>
+					</div>
+					<hr >
+					<h2>Attacks</h2>
+					<span>Name, skill, weapon, Rools : attack, attack aimed, autofire, suppressive fire, damage, reload</span>
+					<div class="row">
+						<div class="col-2">
+
+						</div>
+					</div>
+					<div class="line-filter" data-ref-key="combat_weapon" data-formula="weapon_worn == 1" data-line-name="weapon">
+
+					</div>
+
+
+
+					<!-- Health -->
+					<!-- Luck -->
+					<!-- Skill roll : Brawling, Facedown, Initiative, Evasion -->
+
+					<!-- Show armor penalty-->
+					<!-- Show state penalty-->
+					
+
+				</div>
+				<div id="inventory-tab-pane{sheet-id}" class="tab-pane fade">
+					<!-- Armor -->
+					<!-- Ranged weapons -->
+					<!-- Melee weapons -->
+					<!-- Other things -->
+					<div class="row">
+						<div class="col-2">
+							<button type="button" class="line-button-add" data-line-name="armor">Add</button>
+						</div>
+						<div class="col">
+							<h3>Armors</h3>
+						</div>
+					</div>
+
+					<table>
+						<thead>
+							<tr>
+								<th>Worn</th>
+								<th>Position</th>
+								<th>Type</th>
+								<th>penalty</th>
+								<th>SP</th>
+								<th>Dam</th>
+								<th>Eff. SP</th>
+								<th>-</th>
+							</tr>
+						</thead>
+						<tbody class="line-container" data-line-name="armor">
+
+						</tbody>
+					</table>
+
+					<hr />
+					<div class="row">
+						<div class="col-2">
+							<button type="button" class="line-button-add" data-line-name="weapon">Add</button>
+						</div>
+						<div class="col">
+							<h3>Weapons</h3>
+						</div>
+					</div>
+					<div class="line-container" data-line-name="weapon"></div>
+					
+					<hr />
+					<div class="row">
+						<div class="col-2">
+							<button type="button" class="line-button-add" data-line-name="item">Add</button>
+						</div>
+						<div class="col">
+							<h3>Items</h3>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-1">On you</div>
+						<div class="col-2">Quantity</div>
+						<div class="col-5">Name</div>
+						<div class="col-3">Place</div>
+					</div>
+					<div class="line-container" data-line-name="item"></div>
+
+					
+
+				</div>
+			</div>
+
+			<template class="line-definition" data-line-name="item">
+				<div>
+					<div class="row g-1">
+						<div class="col-1">
+							<input class="form-check-input form-check-input-sm field-line-data" type="checkbox" data-ref-key="worn">
+						</div>
+						<div class="col-2">
+							<div class="input-group input-group-sm">
+								<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+								<input type="text" data-ref-key="qty" class="field-line-data form-control" value="1">
+								<input type="hidden" class="min-value" value="0">
+								<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+							</div>
+						</div>
+						<div class="col-5">
+							<input type="text" data-ref-key="name" class="field-line-data form-control" value="">
+						</div>
+						<div class="col-3">
+							<input type="text" data-ref-key="place" class="field-line-data form-control" value="">
+						</div>
+						<div class="col-1">
+							<div class="" style="align-items: flex-end; justify-content: right; height:100%; display:flex;">
+								<button type="button" class="line-button-delete btn-close " aria-label="Close"></button>
+							</div>
+						</div>
+					</div>
+				</div>
+				
+			</template>
+
+			<template class="filter-template" data-ref-key="combat_weapon">
+				<div>
+					<div class="row">
+						<div class="col-3">
+							<span class="line-data-display" data-ref-key="type"></span>
+							<span class="line-data-display" data-ref-key="damage"></span>
+							<span class="line-data-display" data-ref-key="ammo"></span><span>/</span><span class="line-data-display" data-ref-key="mag_size"></span>
+						</div>
+					</div>
+				</div>
+			</template>
+
+			<template class="line-definition" data-line-name="weapon">
+				<div class="">
+
+					<div class="row g-0">
+						<div class="col-1">
+							<input class="form-check-input form-check-input-sm field-line-data" type="checkbox" data-ref-key="worn">
+						</div>
+						<div class="col-4 form-floating">
+							<select class="form-select form-select-sm field-line-data"  data-ref-key="type">
+								<option selected value="melee_light">Light Melee</option>
+								<option selected value="melee_medium">Medium Melee</option>
+								<option selected value="melee_heavy">Heavy Melee</option>
+								<option selected value="melee_very_heavy">Very Heavy Melee</option>
+
+								<option value="ranged_medium_pistol">Medium Pistol</option>
+								<option value="ranged_heavy_pistol">Heavy Pistol</option>
+								<option value="ranged_very_heavy_pistol">Very Heavy Pistol</option>
+								<option value="ranged_smg">SMG</option>
+								<option value="ranged_heavy_smg">Heavy SMG</option>
+								<option value="ranged_shotgun">Shotgun</option>
+								<option value="ranged_assault_rifle">Assault Rifle</option>
+								<option value="ranged_sniper_rifle">Sniper Rifle</option>
+								<option value="ranged_bow">Bow & crossbow</option>
+								<option value="ranged_grenade_launcher">Grenade Launcher</option>
+								<option value="ranged_rocket_launcher">Rocket Launcher</option>
+							</select>
+							<label>Type</label>
+						</div>
+						<!-- <div class="col-4 form-floating "> -_> Name is not ncessary
+							<input class="form-control form-control-sm field-line-data" data-ref-key="name" placeholder="Name">
+							<label >Name</label>
+						</div> -->
+						<div class="col-3 form-floating">
+							<select class="form-select form-select-sm field-line-data"  data-ref-key="quality">
+								<option value="E">Exceptional</option>
+								<option selected value="S">Standard</option>
+								<option value="P">Poor</option>
+							</select>
+							<label >Quality</label>
+							<input type="hidden" class="field-line-data" data-ref-key="weapon_attack_bonus" data-formula="equalText(weapon_quality,'E') ? 1 : 0" >
+						</div>
+						<div class="col-4 form-floating">
+							<select class="form-select form-select-sm field-line-data"  data-ref-key="skill">
+								<option value="shoulder_arms_total">Shoulder Arms</option>
+								<option selected value="handgun_total">Handgun</option>
+								<option value="heavy_weapon_total">Heavy Weapon</option>
+							</select>
+							<label>Skill</label>
+						</div>
+						
+						
+					</div>
+
+					<div class="row g-0">
+						<div class="col-1">&nbsp;</div>
+						<div class="col-2 form-floating">
+							<select class="form-select form-select-sm field-line-data" data-ref-key="hands">
+								<option selected value="1">1H</option>
+								<option value="2">2H</option>
+							</select>
+							<label>Hands</label>
+						</div>
+						<div class="col-3 form-floating">
+							<input type="text" class="form-control form-control-sm  field-line-data" value="standard" data-ref-key="ammo_kind">
+							<label>Ammo kind</label>
+						</div>
+						<div class="col-6 form-floating">
+							<input type="text" data-ref-key="note" class="field-line-data form-control form-control-sm" value="">
+							<label>Note</label>
+						</div>
+						
+						
+					</div>
+					<div class="row g-1">
+						<div class="col-1">
+							&nbsp;
+						</div>
+						
+						<div class="col-2">
+							
+							<div class="row g-0">
+								<label class="form-control-sm">ROF</label>
+							</div>
+							<div class="row g-0">
+								<div class="col">
+									<div class="input-group input-group-sm">
+										<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+										<input type="text" data-ref-key="rate_of_fire" class="field-line-data form-control" value="1">
+										<input type="hidden" class="min-value" value="1">
+										<input type="hidden" class="max-value" value="2">
+										<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+									</div>
+								</div>
+							</div>
+							
+						</div>
+
+						<div class="col-2">
+							<div class="row g-0">
+								<label class="form-control-sm">Autofire</label>
+							</div>
+							<div class="row g-0">
+								<div class="col">
+									<div class="input-group input-group-sm">
+										<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+										<input type="text" data-ref-key="autofire" class="field-line-data form-control" value="1">
+										<input type="hidden" class="min-value" value="0">
+										<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-2">
+							<div class="row g-0">
+								<label class="form-control-sm">Damage</label>
+							</div>
+							<div class="row g-0">
+								<div class="col">
+									<div class="input-group input-group-sm">
+										<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+										<input type="text" data-ref-key="damage" class="field-line-data form-control" value="2">
+										<span class="input-group-text">D6</span>
+										<input type="hidden" class="min-value" value="0">
+										<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="col-2">
+							<div class="row g-0">
+								<label class="form-control-sm">Ammo</label>
+							</div>
+							<div class="row g-0">
+								<div class="col">
+									<div class="input-group input-group-sm">
+										<button class="btn minus" type="button" onclick="addOrRemove(this)" data-min-value="0"></button>
+										<input type="text" data-ref-key="ammo_left" class="field-line-data form-control" value="2">
+										<input type="hidden" class="min-value" value="0">
+										<input type="hidden" data-ref-key="mag_size" class="max-value field-line-display" value="100">
+										<button class="btn plus " type="button" onclick="addOrRemove(this)"></button>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="col-2">							
+							<div class="row g-0">
+								<label class="form-control-sm">Magazine</label>
+							</div>
+							<div class="row g-0">
+								<div class="col">
+									<div class="input-group input-group-sm">
+										<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+										<input type="text" data-ref-key="mag_size" class="field-line-data form-control" value="1">
+										<input type="hidden" class="min-value" value="0">
+										<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="col-1">
+							<div class="align-bottom" style="align-items: flex-end; justify-content: right; height:100%; display:flex;">
+								<button type="button" class="line-button-delete btn-close " aria-label="Close"></button>
+							</div>
+							
+						</div>
+						
+					</div>
+					<hr />
+				</div>
+
+			</template>
+
+			<template class="line-definition" data-line-name="armor">
+				<tr>
+					<td><input class="form-check-input form-check-input-sm field-line-data" type="checkbox" data-ref-key="worn">
+					</td> <!-- worn -->
+					<td><select class="form-select form-select-sm field-line-data"  data-ref-key="position">
+								<option selected value="body">Body</option>
+								<option value="head">Head</option>
+							</select>
+					</td> <!-- position -->
+					<td><input type="text" class="form-control form-control-sm field-line-data" value="Leathers" data-ref-key="type">
+					</td> <!-- type -->
+					<td>
+						<div class="input-group input-group-sm">
+							<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+							<input type="text" data-ref-key="penalty" class="field-line-data form-control " value="-2">
+							<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+						</div>
+					</td> <!-- penalty -->
+					<td>
+						<div class="input-group input-group-sm">
+							<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+							<input type="text" data-ref-key="sp_max" class="field-line-data form-control" value="10">
+							<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+						</div>
+					</td> <!-- SP -->
+					<td>
+						<div class="input-group input-group-sm">
+							<button class="btn minus" type="button" onclick="addOrRemove(this)" ></button>
+							<input type="text" data-ref-key="ablation" class="field-line-data form-control " value="0">
+							<button class="btn plus" type="button" onclick="addOrRemove(this)"></button>
+						</div>
+					</td> <!-- ablation -->
+					<td>
+						<span  class="field-line-data" data-ref-key="sp_total" data-formula="max(0,armor_sp_max - armor_ablation)"></span>
+						<!-- <input type="text" data-ref-key="sp_total" class="field-line-data form-control" data-formula="max(0,armor_sp_max - armor_ablation)"> -->
+					</td> <!-- effective SP -->
+					<td> 
+						<button type="button" class="line-button-delete btn-close" aria-label="Close"></button>
+					</td> <!-- remove armor -->
+				</tr>
+			</template>
+
+
+		</div>
+	</template>
+		
+  </form>
+  
+  <script >
+		
+
+	function skillEditorToggle(evtArgs) {
+		let element = evtArgs.target;
+		let classToShow = element.checked ? 'skill-editor' : 'skill-display';
+		let classToHide = element.checked ? 'skill-display' : 'skill-editor';
+		let sheetId = element.getAttribute('data-linked-sheet-id');
+		let parentSelector = '#skill-section' + sheetId;
+
+		DomHelper.toggleVisibility(document.querySelectorAll(`${parentSelector} .${classToHide}`), false);
+		DomHelper.toggleVisibility(document.querySelectorAll(`${parentSelector} .${classToShow}`), true);
+	}
+
+	function sortByGroup(left, right) {
+			if (left.group < right.group) return -1;
+			if (left.group > right.group) return 1;
+			if (left.name < right.name) return -1;
+			if (left.name > right.name) return 1;
+			return 0;
+	}
+	function sortByName(left, right) {
+			if (left.name < right.name) return -1;
+			if (left.name > right.name) return 1;
+			return 0;
+	}
+
+	function skillGroupToggle(evtArgs) {
+		let element = evtArgs.target;
+		let sheetId = element.getAttribute('data-linked-sheet-id');
+		let parentId = 'skill-list' + sheetId;
+		let parentNode = document.getElementById(parentId);
+
+		let groupByStat = element.checked;
+		// destroy all skill-separators
+		let separators = document.querySelectorAll(`#${parentId} .skill-separator`);
+		for(let element of separators) {
+			parentNode.removeChild(element);
+		}
+
+		// find all skill-div
+		// create array of Object[node, group, name]
+		// sort array
+		// for all element, insertBefore last-skill-element{sheet-id}
+		let allSkillDivs = document.querySelectorAll(`#${parentId} .skill-div`);
+		arrayToSort = new Array();
+		for(let element of allSkillDivs) {
+			let obj = { node:element, group:element.getAttribute('data-sort-group'), name: element.getAttribute('data-sort-name')};
+			arrayToSort.push(obj);
+		}
+		arrayToSort.sort(groupByStat ? sortByGroup : sortByName);
+
+		let groupName = arrayToSort[0].group;
+		let last = document.getElementById('last-skill-element' + sheetId);
+		let max = arrayToSort.length;
+
+		if (groupByStat) parentNode.insertBefore(TemplateManager.processTemplate('skill-separator', null, [groupName]), last);
+		for (let index=0; index < max; index++) {
+			if (groupByStat && arrayToSort[index].group != groupName) {
+				groupName = arrayToSort[index].group;
+				parentNode.insertBefore(TemplateManager.processTemplate('skill-separator', null, [groupName]), last);
+			}
+			parentNode.insertBefore(arrayToSort[index].node, last);
+		}
+
+		// hide or show stat name from the stat block
+		DomHelper.toggleVisibility(document.querySelectorAll(`#${parentId} .skill-stat-name`), !groupByStat);
+	}
+
+	function skillZeroToggle(evtArgs) {
+		let element = evtArgs.target;
+		let sheetId = element.getAttribute('data-linked-sheet-id');
+		let parentSelector = '#skill-list' + sheetId;
+
+		let hideZeroes = element.checked;
+		
+		let allZeroLines = document.querySelectorAll(parentSelector + ` .skill-div[data-rank-value='0']`);
+		DomHelper.toggleVisibility(allZeroLines, !hideZeroes);
+
+	}
+
+	
+
+	function addOrRemove(evtArgs) {
+		let element = evtArgs.target ? evtArgs.target : evtArgs;
+		let valueChange = 0;
+		let originalValue = 0;
+		valueChange = DomHelper.hasClass(element, 'minus') ? -1 : 1;
+		if (element.hasAttribute("data-value-change")) value = parseInt(element.getAttribute("data-value-change"));
+		
+		// find parent
+		let inputControl = element.parentNode.querySelector("input");
+		let bdCheck = new BoundChecker(inputControl, valueChange);
+		if (bdCheck.result.valueChanged) {
+			inputControl.value = bdCheck.result.value;
+			inputControl.dispatchEvent( new Event("change")); // trigger the onchange event, as if the user changed the value
+		}
+	}
+
+	class BoundChecker {
+		#_element = null;
+		constructor(element, changeToValue) {
+			this.#_element = element;
+			this.result = {value:parseInt(this.#_element.value), valueChanged: false};
+			this.bounds = { min:0, max:0, minDefined: false, maxDefined: false };
+			this.getValueRelatedInfo('min');
+			this.getValueRelatedInfo('max');
+			let newValue = this.result.value + changeToValue;
+			if (this.bounds.minDefined && newValue < this.bounds.min) {
+				newValue = this.bounds.min;
+			}
+			if (this.bounds.maxDefined && newValue > this.bounds.max) {
+				newValue = this.bounds.max;
+			}
+			if (newValue != this.result.value) {
+				this.result.valueChanged = true;
+				this.result.value = newValue;
+			}
+			//return this.result;
+		}
+
+		getValueRelatedInfo(link) {
+			let input = this.#_element.parentNode.querySelector("." + link +"-value");
+			if (input) {  
+				this.bounds[link] = input.value;
+				this.bounds[link + "Defined"] = true;
+			}
+		}
+	}
+
+	function getNewSheetIndex() {
+		let navRoot = document.getElementById('sheetList');
+		let index = parseInt(navRoot.getAttribute('data-sheet-count') ?? '0');
+		navRoot.setAttribute('data-sheet-count', index + 1);
+		return index;
+	}
+
+	function insertSheetInNavigation(sheetIndex, sheetName) {
+		let navRoot = document.getElementById('sheetList');
+		let otherClasses = sheetIndex == 0 ? 'active' : '';
+		let newNav = TemplateManager.processTemplate('sheet-nav', null, [sheetName,otherClasses,sheetIndex ]);
+
+		navRoot.insertBefore(newNav, document.getElementById('sheet-action-dropdown') );
+	}
+
+	function insertSheet(sheetIndex,sheetName) {
+		let parentElementId = 'sheet-'+ sheetName;
+		var replaces = new Map();
+		replaces.set('{sheet-id}', sheetIndex);
+		replaces.set('{sheet-name}', sheetIndex);
+
+		var evMap = new Map();
+		//evMap.set('stat-editor-click', changeDisplayGroupOne); //(evArgs) => { alert(evArgs.target); });
+		evMap.set('skill-editor-toggle', skillEditorToggle);
+		evMap.set('skill-group-toggle', skillGroupToggle);
+		evMap.set('skill-zero-toggle', skillZeroToggle);
+
+		
+		var charSheet = TemplateManager.processTemplate('pc-sheet', evMap, [sheetIndex, sheetName]);
+		if (sheetIndex == 0) {
+			charSheet.classList.add("show");
+			charSheet.classList.add("active");
+		} else {
+			charSheet.classList.add("fade");
+		}
+		
+		let holder = document.getElementById('sheet-holder');
+		// run a new das-ui instance
+		holder.appendChild(charSheet);
+
+		var dasHandler = new DasUiHandler();
+		dasHandler.selects.root = '#' + parentElementId;
+		dasHandler.initialize(sheetName);
+	}
+
+	function addSheet(sheetName) {
+		let sheetIndex = getNewSheetIndex();
+		insertSheet(sheetIndex, sheetName);
+		insertSheetInNavigation(sheetIndex, sheetName);
+
+	}
+
+	function userAddSheet() {
+		let sheetName = document.getElementById('action-add-sheet-name').value;
+		addSheet(sheetName);
+	}
+
+	
+	addSheet('Player');
+	//addSheet('Ramon');
+
+
+	/*var dasHandler = new DasUiHandler();
+	dasHandler.initialize();
+		
+
+	document.getElementById('action-reset-data').addEventListener('click', () => { dasHandler.reset(); });
+	document.getElementById('action-load-data').addEventListener('click', () => { doContextAction((name) => { dasHandler.load(name); } ); } );
+	document.getElementById('action-save-data').addEventListener('click', () => { doContextAction((name) => { dasHandler.save(name); } ); } );
+	*/
+  </script>
+</body>
+</html>

@@ -10,6 +10,7 @@ const EnumAspectKind = Object.freeze({
 	Reference: 'reference',// meant for direct simple reference. Else, weight might be off and values propagation could be affected.
 	Formula: 'formula',
 	Lines: 'lines',
+	LineFilter: 'line-filter',
 	isValid: function (value) {
 		let found = false;
 		Object.getOwnPropertyNames(this).forEach(propertyName => { if (this[propertyName] == value) found = true; });
@@ -127,6 +128,7 @@ class AspectDefinition {
 	#_name = '';
 	#_kind = '';
 	#_supplemental = null;
+	/** @type {string} */
 	#_defaultValue = null;
 	#_dataType = EnumDataType.NotSet;
 
@@ -156,6 +158,9 @@ class AspectDefinition {
 		if (kind == EnumAspectKind.Reference && !((supplemental && typeof supplemental == 'string'))) {
 			throw "Reference Aspect need to have a non empty reference given";
 		}
+		if (kind == EnumAspectKind.LineFilter && (supplemental == null || !(supplemental instanceof LineFilterProperties ))) {
+			throw "Line Filter Aspect need to have a non empty line name";
+		}
 		this.#_name = name;
 		this.#_kind = kind
 		this.#_supplemental = supplemental;
@@ -178,6 +183,7 @@ class AspectDefinition {
  * @class LinePropertiesDefinition
  */
 class LinePropertiesDefinition {
+	/** @type {Map<string, AspectDefinition>} */
 	#_properties = new Map();
 
 	get properties() { return this.#_properties; }
@@ -191,6 +197,18 @@ class LinePropertiesDefinition {
 }
 
 /**
+ * Class to hold properties for Line Filters
+ *
+ * @class LineFilterProperties
+ */
+class LineFilterProperties {
+	constructor(lineName, filter) {
+		this.lineName = lineName;
+		this.filter = filter;
+	}
+}
+
+/**
  * Class to hold modifier information from the html page to the AspectManagermentSystem
  *
  * @class AspectModifiedInfo
@@ -200,6 +218,7 @@ class AspectModifiedInfo {
 	#_property = '';
 	#_lineID = -1;
 	#_value = '';
+	/** @type {string} */
 	#_lineOperation = null;
 	constructor(name, property, lineID, value, lineOperation) {
 		this.#_name = name;
@@ -229,9 +248,13 @@ class AspectModifiedInfo {
  * @class AspectSystemManager
  */
 class AspectSystemManager {	
+	/** @type {AspectScopeManager} */
 	#_scopeManager;
+	/** @type {AspectManager} */
 	#_aspectManager;
+	/** @type {LineAspectManager} */
 	#_lineAspectManager;
+	/** @type {DasStorageService} */
 	#_storageService;
 	#_modifiedAspectValueCallback;
 	#_defaultContext = 'default';
@@ -293,6 +316,7 @@ class AspectSystemManager {
 			try {
 				this.#_modifiedAspectValueCallback(aspect.toAspectModifiedInfo());
 			} catch (e) {
+				console.log(aspect);
 				console.error(e);
 			}
 		}
@@ -308,12 +332,20 @@ class AspectSystemManager {
 		} else {
 			aspect = this.#_aspectManager.setValue(aspectModifiedInfo);
 		}
-		this.onChangedValue(aspect); // save value directly changed by the user, as it will not be propagated
+		// TODO : Remove line. this should have been fixed
+		//this.onChangedValue(aspect); // save value directly changed by the user, as it will not be propagated
 	}
 
 	getValue(name) {
 		let properName = AspectScopeManager.getProperName(name);
 		return this.#_aspectManager.getValue(properName);
+	}
+
+	setEmptyData(dataKey) {
+		this.#_scopeManager.isLoading = false;
+		this.resetData(true); // reset the sheet and context key
+		this.#_contextKey = dataKey;
+		this.sendAllValues(false); // resends all the values and save them
 	}
 
 	loadData(dataKey) {
@@ -325,8 +357,7 @@ class AspectSystemManager {
 		this.#_scopeManager.isLoading = true;
 		let aspectValues = this.#_storageService.getData(dataKey);
 		if (!aspectValues || aspectValues.size < 1) {
-			console.log(`WARNING : Context '${dataKey}' was empty. nothing loaded, but context switched.`)
-			this.#_contextKey = dataKey;
+			this.setEmptyData(dataKey)
 			return;
 		}
 		this.resetData(true); // reset the sheet and context key
@@ -354,6 +385,15 @@ class AspectSystemManager {
 		for (let change of modifiedAspectLineArray) {
 			this.#_modifiedAspectValueCallback(change);
 		}
+	}
+
+	resend(aspectName, lineID) {
+		let aspect = this.#_scopeManager.aspects.get(aspectName);
+		let resultAspects = aspect;
+		if (typeof aspect === 'LineElement') {
+			resultAspects = aspect.getAllLineAspects(this.#_scopeManager.aspects, lineID);
+		}
+		this.onChangedValue(resultAspects, false);
 	}
 
 	saveData(dataKey) {
@@ -410,7 +450,7 @@ class AspectSystemManager {
 		}
 		this.#_scopeManager.setResolutionOrder();
 		this.#_scopeManager.propagateChange(aspectChangedArray, false);
-		
+
 		this.#_scopeManager.isLoading = false;
 	}
 
@@ -442,6 +482,7 @@ class AspectSystemManager {
 */
 
 class AspectManager {
+	/** @type {AspectScopeManager} */
 	#_scopeManager;
 
 	/**
@@ -620,9 +661,10 @@ class AspectScopeManager {
 				//console.log("does not refers to");
 			}
 		}
-		if (skipFirst) {
-			changeToPropagate.shift(); // remove, no need to change for a specifically changed aspect
-		}
+		// because of displayfield, we always need to resend the values to update
+		//if (skipFirst) {
+		//	changeToPropagate.shift(); // remove, no need to change for a specifically changed aspect
+		//}
 
 		if (changeToPropagate) {
 			this.#_changedAspectCallback(changeToPropagate);
@@ -674,7 +716,7 @@ class AspectScopeManager {
 
 	recalculate() {
 		this.setResolutionOrder();
-		for (let aspect of this.aspects.values()) {
+		for (let aspect of this.resolutionOrder) {
 			aspect.getValue(this.scope, true); // get value, force recalculation to take loaded values into account
 		}
 	}
@@ -693,8 +735,11 @@ class AspectScopeManager {
 }
 
 class LineAspectManager {
+	/** @type {AspectScopeManager} */
 	#_scopeManager;
+	/** @type {AspectManager} */
 	#_aspectManager;
+	/** @type {LineElement[]} */
 	#_lineAspects = new Array();
 
 	constructor(AspectManager, scopeManager) {
@@ -743,13 +788,13 @@ class LineAspectManager {
 			case EnumAspectKind.Formula: // single shared instance accross lines
 				return function (p, lineID) {  
 					let propDef = propertyDefinition;
-					let formula = p.parentLine.getIndexedLineIdentifier(propDef.supplemental, lineID);
+					let formula = p.parentLine.transformFormula(propDef.supplemental, lineID);
 					return aspectManager.createAspect(new AspectDefinition(originalName, EnumAspectKind.Formula, formula, propDef.name));
 				}
 			case EnumAspectKind.Reference: // new instance per line
 				return function (p, lineID) {  
 					let propDef = propertyDefinition;
-					let reference = p.parentLine.getIndexedLineIdentifier(propDef.supplemental, lineID);
+					let reference = p.parentLine.transformFormula(propDef.supplemental, lineID);
 					return aspectManager.createAspect(new AspectDefinition(originalName, EnumAspectKind.Reference, reference, propDef.name));
 				}
 			default:
@@ -822,7 +867,7 @@ class LineAspectManager {
 					let aspectValue = new LinePropertyValue(aspectProp, aspectDefinition.name, lineID);
 					this.#_aspectManager.completeAspectDefinition(aspectValue, aspectDefinition);
 					aspectValue.initializeFromScope(this.#_scopeManager.scope, true);
-					this.#_aspectManager.aspects.set(aspectValue.name, aspectValue);
+					this.#_scopeManager.aspects.set(aspectValue.name, aspectValue);
 				}
 				let modifiedInfo = new AspectModifiedInfo(lineAspect.name, '', lineID, '', 'add');
 				operations.push(modifiedInfo);
@@ -876,8 +921,11 @@ class LineAspectManager {
 class BaseAspect {
 	#_name = '';
 	#_originalName = '';
+	/** @type {EnumCalculatedState} */
 	#_valueCalculatedState;
+	/** @type {EnumCalculatedState} */
 	#_weightCalculatedState;
+	/** @type {string} */
 	#_defaultValue = null;
 	#_isDirectValue = true;
 	#_canSaveToStorage = true;
@@ -952,9 +1000,9 @@ class BaseAspect {
 		return;
 	}
 
-	getWeight(aspectMap) {
+	getWeight(aspectMap, circularCheckMap) {
 		if (!this.isWeightCalculated) {
-			this.calculateWeight(aspectMap);
+			this.calculateWeight(aspectMap, circularCheckMap);
 			this.weightCalculatedState = EnumCalculatedState.Calculated;
 		}
 		return this.#_weight;
@@ -978,6 +1026,7 @@ class BaseAspect {
 // Name R. reference: F. value depends on F and returns evaluated aspect value. 1 in this case.
 // Must points to another aspect. That aspect should have the name of an aspect in it.
 class AspectReference extends BaseAspect {
+	/** @type {string[]} */
 	#_referedMembers = Array(1);
 	#_additionalWeight = 10;
 
@@ -1062,7 +1111,8 @@ class AspectReference extends BaseAspect {
 }
 
 class AspectFormula extends BaseAspect {
-
+	#_i = 1;
+	/** @type {mathjs} */
 	#_formula = null;
 	#_textFormula = '';
 	#_referedMembers = new Map();
@@ -1115,18 +1165,26 @@ class AspectFormula extends BaseAspect {
 		return;
 	}
 
+	
 	calculateWeight(aspectMap, circularCheckMap) {
 		if (!(aspectMap)) {
 			console.error(this.name + " getWeight() called without needed arguments");
 			return 1000;
 		}
+		this.#_i +=1;
+
 		if (!circularCheckMap) {
 			circularCheckMap = new Map();
-		} else if (circularCheckMap.has(this.name)) {
-			console.error("Formula circular reference error :" + member);
-			return 1000;
 		}
-		circularCheckMap.set(this.name, 1);
+
+		if (circularCheckMap.has(this.name)) {
+			console.error("Formula circular reference error :" + this.name + "\n" + this.#_textFormula);
+			//throw "Formula circula reference error : "
+			return 1000;
+		} else {
+			circularCheckMap.set(this.name, 1);
+		}
+	
 		this.weight = 1;
 		for (let member of this.#_referedMembers.keys()) {
 			let memberAspect = aspectMap.get(member);
@@ -1139,9 +1197,53 @@ class AspectFormula extends BaseAspect {
 		}
 	}
 }
+/* Dropped ... Usage in UI only
+class LineFilter extends BaseAspect {
+	#_associatedLine = '';
+	#_filterFormula = null;
+	
+	constructor(originalName, name, filter, lineName) {
+		super(originalName, name, false, false); // not a direct value. not saved to storage (recalculated).
+		this.value = new Map();
+		this.#_filterFormula = new AspectFormula('internal', 'internal', filter);
+		this.#_associatedLine = lineName;
+		this.valueCalculatedState = EnumCalculatedState.AlwaysCalculate;
+	}
+
+	calculateValue(scope, forceCalculation = false) {
+		let lineMap = scope.get(this.#_associatedLine);
+		
+		// set all results to missing (0)
+		for(let entryKey of this.value.keys()) {
+			this.value.get(entryKey) = 0;
+		}
+
+		for(let line of lineMap) {
+			let entryKey = line[0];
+			let lineEntry = line[1];
+			this.value.get(entryKey) = this.#_filterFormula.value(lineEntry, true);
+		}
+	}
+
+	refersTo(aspectArray, aspectLineValue) {
+		if (aspectArray.includes(this.#_associatedLine) {
+			return true;
+		}
+		return this.#_filterFormula.refersTo(aspectArray, aspectLineValue);
+	}
+
+	calculateWeight(aspectMap, circularCheckMap) {
+		return this.#_filterFormula.calculateWeight(aspectMap, circularCheckMap);
+	}
+
+
+}
+*/
 
 class LineElement extends BaseAspect {
+	/** @type {Map<string, AspectDefinition>} */
 	#_propertiesDefinition = null;
+	/** @type {Map<string, Object>} */
 	#_values = new Map(); // key = lineIndex, value = Object() where all lines properties are added
 
 	constructor(originalName, name, propertyMap) {
@@ -1158,14 +1260,41 @@ class LineElement extends BaseAspect {
 	get propertiesDefinition() { return Array.from(this.#_propertiesDefinition.values()); }
 	get lineCount() { return this.#_values.size; }
 
+	// transform formula references of fields with the lineID
+	transformFormula(originalFormula, lineID) {
+		let newFormula = originalFormula;
+		for(let propDef of this.#_propertiesDefinition.values()) {
+			let refName = this.getPropertyAspectName(propDef.name);
+			let newName = this.getValuePropertyAspectName(refName, lineID);
+			newFormula = newFormula.replaceAll(refName, newName);
+		}
+		return newFormula;
+	}
+
+	// properties, propertyValues
+	getAllLineAspects(aspects, filterLineID) {
+		let ignoreLine = filterLineID ? true : false;
+		let result = Array();
+		for(let propDef of this.#_propertiesDefinition.values()) {
+			result.push(aspects.get(this.getPropertyAspectName(propDef.name)));
+		}
+		let propCount = result.length;
+		for(let lineID of this.#_values.keys()) {
+			for(let propIndex=0; propIndex < propCount; propIndex++) {
+				if (ignoreLine || lineID == filterLineID) {
+					let propValueName = this.getValuePropertyAspectName(result[propIndex].name, lineID);
+					result.push(aspects.get(propValueName));
+				}
+			}
+		}
+		return result;
+	}
+
 	getPropertyAspectName(propName) {
 		return this.name + "_" + propName;
 	}
 	getValuePropertyAspectName(propName, lineId) {
 		return propName + "_" + lineId;
-	}
-	getIndexedLineIdentifier(formula, lineID) {
-		return formula.replaceAll('[line-id]', '_' + lineID);
 	}
 	getLine(lineID) {
 		return this.#_values.get(lineID);
@@ -1215,7 +1344,7 @@ class LineElement extends BaseAspect {
 
 // this element should not be referred directly
 class LineProperty extends BaseAspect {
-
+	/** @type {LineElement} */
 	#_lineAspect = null;
 	#_additionalWeight = 100;
 	#_linkedAspectFactory = null;
@@ -1271,8 +1400,11 @@ class LineProperty extends BaseAspect {
 }
 
 class LinePropertyValue extends BaseAspect {
+	/** @type {LineProperty} */
 	#_parentProperty = null;
+	/** @type {LineElement} */
 	#_parentLine = null;
+	/** @type {BaseAspect} */
 	#_linkedAspect;
 	#_lineID = -1;
 	#_additionalWeight = 10;
@@ -1353,20 +1485,46 @@ class LinePropertyValue extends BaseAspect {
 
 }
 
+// ****************************************************************************************
+// Functions for math.js, the formula parser
+
+function getCheckCondition(propNameCond, propValueCond) {
+	let checkCondition = (o) => { return true; }
+		
+	if (propNameCond && propValueCond) {
+		if (Array.isArray(propNameCond._data) && Array.isArray(propValueCond._data)) {
+			let arrayCount = math.min(propNameCond._data.length, propValueCond._data.length);
+			checkCondition = (o) => {
+				for (let condIndex=0 ; condIndex<arrayCount;condIndex++ ) {
+					if (o[propNameCond._data[condIndex]] != propValueCond._data[condIndex]) {
+						return false;
+					}
+				}
+				return true;
+			}
+		} else {
+			checkCondition = (o) => { return o[propNameCond] == propValueCond; }
+		}
+	}
+	return checkCondition;
+}
+
 // import the new function in the math namespace
 math.import({
 	// operation: sum, count, mean
 	lineAggregate: function(lineMap, propertyName, operation, propNameCond, propValueCond) {
 		if (!operation) operation = "sum";
-		let hasCondition = !(propNameCond && propValueCond);
+		let checkCondition = getCheckCondition(propNameCond, propValueCond);
+
 		let index = 0;
 		let valueArray = Array();
 		for (let lineObject of lineMap.values()) {
-			if (!hasCondition || (lineObject[propNameCond] == propValueCond)) {
+			if (checkCondition(lineObject)) {
 				valueArray.push(lineObject[propertyName]);
 				index += 1;
 			}
 		}
+
 		if (index == 0) return 0; // when empty, return 0 as the value
 		switch (operation) {
 			case "sum":
@@ -1384,9 +1542,10 @@ math.import({
 		}
 	},
 	lineFirst: function (lineMap, propNameCond, propValue) {
+		let checkCondition = getCheckCondition(propNameCond, propValue);
 		for (let lineObject of lineMap.values()) {
 			if (lineObject.hasOwnProperty(propNameCond)) {
-				if (lineObject[propNameCond] == propValue) {
+				if (checkCondition(lineObject)) {
 					return lineObject;
 				}
 			}
