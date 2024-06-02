@@ -22,7 +22,7 @@ class DasSelectors {
   lineParent = '.line-parent'; // element defining the parent element of each individual line
 
 	lineFilterTemplate = 'template.line-filter-template';
-	lineFilter = 'line-filter';
+	lineFilterDefinition = '.line-filter-definition';
 }
 
 /**
@@ -37,6 +37,7 @@ class DasAttributes {
 
 	defaultValue = 'data-default-value';
 	valueDestination = 'data-value-attribute'; // for element that do not want value or innerText set. the named attribute will be set instead (display only).
+	fnValueChange = "data-value-callback"; // Value must be a root function. When value change in the UI, window[value](domElement, newValue) will be called
 
 	fieldKey = 'data-ref-key';
   fieldFormula = 'data-formula';
@@ -46,67 +47,93 @@ class DasAttributes {
   lineName = 'data-line-name';
 }
 
+class DomLineInfo {
+	/**
+	 * Creates an instance of DomLineInfo.
+	 * @param {string} lineName
+	 * @param {string} lineID
+	 * @memberof DomLineInfo
+	 */
+	constructor(lineElement, lineName, lineID) {
+		/** @type {Element} */
+		this.lineElement = lineElement;
+		/** @type {Map<string,DomLineProperty>} */
+		this.properties = new Map();
+		/** @type {string} */
+		this.lineName = lineName;
+		/** @type {string} */
+		this.lineID = lineID;
+	}
+}
+class DomLineProperty {
+/**
+ * Creates an instance of DomLineProperty.
+ * @param {DomLineInfo} line
+ * @param {Element} element
+ * @param {string} refKey
+ * @param {string|number} value
+ * @memberof DomLineProperty
+ */
+constructor(line, element, refKey, value) {
+		/** @type {DomLineInfo} */
+		this.parentLine = line;
+		/** @type {string} */
+		this.refKey = refKey;
+		/** @type {Element} */
+		this.element = element;
+		/** @type {number|string} */
+		this.value = value;
+	}
+}
 
 class LineFiltering {
 	/** @type {LineFilter[]} */
 	#_filters = new Array();
 
 	/**
-	 * @summary Create a new Line Filter based on a line and filter
-	 * @param {modifiedAspect} definition
+	 * Add an active line filter processor
+	 * @param {*} filterName
+	 * @param {*} lineName
 	 * @memberof LineFiltering
 	 */
-	createNew(definition) {
-		let filterProps = definition.suppl;
-		let filter = new LineFilter(definition.name, filterProps.lineName, filterProps.filter);
+	addFilter(filterName, lineName) {
+		let filter = new LineFilter(filterName, lineName);
 		this.#_filters.push(filter);
 	}
 
 	/**
 	 * @param {DasUiHandler} uiHandler
-	 * @param {modifiedAspect} modifiedAspect
+	 * @param {AspectModifiedInfo} modifiedAspect
 	 * @memberof LineFiltering
 	 */
 	validateChange(uiHandler, modifiedAspect) {
-		if (!modifiedAspect.lineID) {
+		if (modifiedAspect.lineOperation != 'filter') {
 			return; // not a line field, ignore value
 		}
-		let lineID = modifiedAspect.lineID;
-		if (modifiedAspect.lineOperation === 'del') {
-			this.#validateDeletion(uiHandler, modifiedAspect);
-			return;
-		}
+		// DEBUG
+		console.log(`validateChange filtering ${modifiedAspect.name} : ${JSON.stringify(modifiedAspect.value)}`);
+		let lineIds = Array.isArray(modifiedAspect.value) ? modifiedAspect.value : [];
 		for(let filter of this.#_filters) {
-			if (filter.hasImpact(modifiedAspect)) {
-				if (filter.actions.add) { 
-					this.#addLine(uiHandler, filter, lineID); 
-					uiHandler.resend(modifiedAspect.name, lineID);
+			if (filter.name != modifiedAspect.name) {
+				continue;
+			}
+			let changes = filter.getChangeList(lineIds);
+			for (let change of changes) {
+				switch (change.op) {
+					case 'add':
+						this.#addLine(uiHandler, filter, change.lineID); 
+						uiHandler.resend(filter.lineName, change.lineID);	
+						break;
+					case 'del':
+						this.#removeLine(uiHandler, filter, change.lineID);
+						break;
 				}
-				if (filter.actions.del) { this.#removeLine(uiHandler, filter, lineID); }
-				filter.actions = {};
 			}
 		}
 	}
 
-	/**
-	 * @param {DasUiHandler} uiHandler
-	 * @param {modifiedAspect} modifiedAspect
-	 * @memberof LineFiltering
-	 */
-	#validateDeletion(uiHandler, modifiedAspect) {
-		// update internal
-		if (!modifiedAspect.lineID) {
-			return; // not a line field, ignore value
-		}
-		let linkedFilters = this.#_filters.filter( x => x.lineName == modifiedAspect.name);
-		for(let lineFilter of linkedFilters) {
-			lineFilter.deleteLine(modifiedAspect.lineID);
-			uiHandler.removeLine(lineFilter.lineName, modifiedAspect.lineID, lineFilter.name);
-		}
-	}
-
 	/**	
-	 * 	@summary adds a line in a filter collection
+	 *  adds a line in the UI for a filter
 	 * 	@param {DasUiHandler} uiHandler Ui handler to interact with the dom
 	 * 	@param {LineFilter} lineFilter LineFilter affected
 	 *  @param {string} lineID Line ID added
@@ -114,17 +141,18 @@ class LineFiltering {
 	#addLine(uiHandler,lineFilter, lineID) {
 		uiHandler.addNewDomLine(lineFilter.lineName, lineID, lineFilter.name);
 		lineFilter.addLine(lineID);
-		// ask for new values !
 	}
 	
 	/**
-	 * @summary Remove a line in the filter collection
+	 * Remove a line in the UI for a filter
 	 * @param {DasUiHandler} uiHandler
 	 * @param {LineFilter} lineFilter
+	 *  @param {string} lineID Line ID to remove
 	 * @memberof LineFiltering
 	 */
-	#removeLine(uiHandler,lineFilter) {
-		uiHandler.deleteDomLine(lineFilter.lineName, modifiedAspect.lineID, lineFilter.name);
+	#removeLine(uiHandler,lineFilter, lineID) {
+		uiHandler.deleteDomLine(lineFilter.lineName, lineID, lineFilter.name);
+		lineFilter.deleteLine(lineID);
 	}
 }
 
@@ -133,26 +161,23 @@ class LineFiltering {
  */
 class LineFilter {
 	#_name = '';
-	#_filterText = ''; // used in debug only
 	#_lineName = '';
-	/** @type {string} */
-	#_formula = null;
-	/** @type {Map<string, string>} */
-	#_lines = new Map();
-	actions = {};
+	/** @type {string[]} */
+	#_lines = [];
+	/** @typedef {{ op:string, lineID:string }} OperationInfo  */
+	/** @type {OperationInfo[]} */
+	actions = [];
 
 	/**
 	 * Creates an instance of LineFilter.
 	 * @param {string} name Name of the filter, for Dom element reference
 	 * @param {string} lineName Name of the LineElement that is an Aspect in DAS
-	 * @param {string} filter Formula to evaluate to include a given lineID into the filter shown line
 	 * @memberof LineFilter
 	 */
-	constructor(name, lineName, filter) {
+	constructor(name, lineName) {
 		this.#_name = name;
 		this.#_lineName = lineName;
-		this.#_filterText = filter;
-		this.#_formula = new AspectFormula(name, name, filter);
+		
 	}
 	get name() { return this.#_name; }
 	get lineName() { return this.#_lineName; }
@@ -162,7 +187,7 @@ class LineFilter {
 	 * @memberof LineFilter
 	 */
 	addLine(lineID) {
-		this.#_lines.add(lineID, lineID);
+		this.#_lines.push(lineID);
 	}
 
 	/**
@@ -170,41 +195,32 @@ class LineFilter {
 	 * @memberof LineFilter
 	 */
 	deleteLine(lineID) {
-		if (this.#_lines.has(lineID)) {
-			this.#_lines.remove(lineID);
+		let lineIndex = this.#_lines.indexOf(lineID);
+		if (lineIndex > -1) {
+			this.#_lines.splice(lineIndex,1);
 		}
 	}
 
 	/**
-	 * @param {ModifierAspect} modifiedAspect
-	 * @return {boolean} Is the line to be added or removed after filter analysys
+	 * @param {string[]} lineIds
+	 * @return {OperationInfo[]} Any Operations needed. null/empty for none
 	 * @memberof LineFilter
 	 */
-	hasImpact(modifiedAspect) {
-		let change = false;
-		if (!this.#_formula.refersTo([modifiedAspect])) {
-			// not an element referred in the filter, ignore
-		}
-		let completeName = `${modifiedAspect.name}_${modifiedAspect.property}`;
-		let scope = new Map();
-		scope.set(completeName, modifiedAspect.value);
-		let passFilter = this.#_formula.getValue(scope, true);
-		if (passFilter) {
-			if (this.#_lines.has(modifiedAspect.lineID)) {
-				return; // already in and should be, no problem.
-			} else { // not in lines, but should be !
-				this.actions.add = modifiedAspect.lineID;
-				change = true;
-			}
-		} else {
-			if (this.#_lines.has(modifiedAspect.lineID)) {
-				this.actions.del = modifiedAspect.lineID; // already in. should not be
-				change = true;
-			} else { 
-				return; // not in lines,so is ok.
+	getChangeList(lineIds) {
+		// compare lines ID to current line ID
+		/** @type {OperationInfo[]} */
+		let changeList = [];
+		for (let currentLine of this.#_lines) {
+			if (!lineIds.find((x) => x === currentLine)) {
+				changeList.push({op:'del',lineID:currentLine});
 			}
 		}
-		return change;
+		for (let newLine of lineIds) {
+			if (!this.#_lines.find((x) => x === newLine)) {
+				changeList.push({op:'add',lineID:newLine});
+			}
+		}
+		return changeList;
 	}
 
 }
@@ -249,7 +265,7 @@ class DasUiHandler {
 	get doCallback() { return this.#_doCallback; }
 
 	/**
-	 * @summary Initialize the DAS when the Dom is ready
+	 * Initialize the DAS when the Dom is ready
 	 * @param {string} dataContextName
 	 * @memberof DasUiHandler
 	 */
@@ -257,19 +273,27 @@ class DasUiHandler {
 		let fnLoad = () => {
 			if (document.readyState == "complete") {
 				console.log('initializing ' + dataContextName);
-				this.#initializeWhenReady(dataContextName, this.#_storageService);	
+				this.#initializeWhenReady(dataContextName);	
 			}
 		}
 		if (document.readyState != "complete") {
 			document.addEventListener('readystatechange', fnLoad);
 		} else {
-			this.#initializeWhenReady(dataContextName, this.#_storageService);
+			this.#initializeWhenReady(dataContextName);
 		}
 		
 	}
 
 	/**
-	 * @summary Loads data from the StorageSystem with the given key
+	 * Restore callback functionnality. For debug purpose.
+	 * @memberof DasUiHandler
+	 */
+	unstuck() {
+		this.#_doCallback = true;
+	}
+
+	/**
+	 * Loads data from the StorageSystem with the given key
 	 * @param {string} dataKey key for the Storage save and load
 	 * @memberof DasUiHandler
 	 */
@@ -278,7 +302,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Reset data in the UI
+	 * Reset data in the UI
 	 * @memberof DasUiHandler
 	 */
 	reset() {
@@ -286,7 +310,7 @@ class DasUiHandler {
 	}
 	
 	/**
-	 * @summary Saves data to the StorageSystem with the given key
+	 * Saves data to the StorageSystem with the given key
 	 * @param {string} dataKey key for the Storage save and load
 	 * @memberof DasUiHandler
 	 */
@@ -295,23 +319,23 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Sends an Aspect values back to the Ui, with the onchange callback
+	 * Sends an Aspect values back to the Ui, with the onchange callback
 	 * @param {string} aspectName Aspect name to send back
 	 * @param {string?} [lineID] lineID to resend. When empty, will resends all line
 	 * @memberof DasUiHandler
 	 */
-	askResend(aspectName, lineID) {
+	resend(aspectName, lineID) {
 		this.#_dakairAspectSystem.resend(aspectName, lineID);
 	}
 
 	/**
-	 * @summary Initialize the system. Only call when the Dom is ready, else won't be able to find definitions
+	 * Initialize the system. Only call when the Dom is ready, else won't be able to find definitions
 	 * @param {string} dataContextName key for the Storage save and load
 	 * @memberof DasUiHandler
 	 */
 	#initializeWhenReady(dataContextName) {
 		console.log("initializeWhenReady called");
-        this.#_dakairAspectSystem = new AspectSystemManager((aspect) => { this.onAspectValueChange(aspect); });
+    this.#_dakairAspectSystem = new AspectSystemManager((aspect) => { this.onAspectValueChange(aspect); }, this.#_storageService);
 		let aspectArray = this.#detectRegularAspects();
 		aspectArray = aspectArray.concat(this.#detectLinesDefinitions());
 		aspectArray = aspectArray.concat(this.#detectLineFilters());
@@ -321,7 +345,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Finds all regular aspects defined in the DOM under the given root
+	 * Finds all regular aspects defined in the DOM under the given root
 	 * @return {AspectDefinition[]} List of regular Aspect Definitions
 	 * @memberof DasUiHandler
 	 */
@@ -339,7 +363,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Finds all Lines Aspects defined in the DOM under the given root
+	 * Finds all Lines Aspects defined in the DOM under the given root
 	 * @return {AspectDefinition[]} List of LineElement Aspect Definitions
 	 * @memberof DasUiHandler
 	 */
@@ -363,7 +387,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Finds and creates all Lines Filters (UI Only) defined in the DOM under the given root.
+	 * Finds and creates all Lines Filters (UI Only) defined in the DOM under the given root.
 	 * @memberof DasUiHandler
 	 */
 	#detectLineFilters() {
@@ -376,12 +400,15 @@ class DasUiHandler {
 			let filter = nodeTemplate.getAttribute(this.attrs.fieldFormula);
 			let suppl = new LineFilterProperties(lineName, filter);
 
-			this.#_lineFiltering.createNew(new AspectDefinition(filterName, EnumAspectKind.Lines, suppl));
+			this.#_lineFiltering.addFilter(filterName, lineName);
+			let aspect = new AspectDefinition(filterName, EnumAspectKind.LineFilter, suppl);
+			allFilters.push(aspect);
 		}
+		return allFilters;
 	}
 
 	/**
-	 * @summary Setup an aspect Dom element events and disables any Formula
+	 * Setup an aspect Dom element events and disables any Formula
 	 * @param {domElement} element
 	 * @param {boolean} doEventSetup
 	 * @memberof DasUiHandler
@@ -398,7 +425,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary for a line element, setup basic properties needed for a data-field
+	 * For a line element, setup basic properties needed for a data-field
 	 * @param {DomElement} element
 	 * @param {string} lineName
 	 * @param {string} lineID
@@ -419,7 +446,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Detect Add buttons (outside of line template)
+	 * Detect Add buttons (outside of line template)
 	 * @memberof DasUiHandler
 	 */
 	#detectLineAddButtons() {
@@ -432,7 +459,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary setup line delete button inside Line template
+	 * Setup line delete button inside Line template
 	 * @param {DomElement} element
 	 * @param {string} lineName
 	 * @param {string} lineID
@@ -452,7 +479,7 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Patch function to turn a selector to a class name for querySelector operations
+	 * Patch function to turn a selector to a class name for querySelector operations
 	 * @param {string} selector value of the DAS selector
 	 * @return {string} value of the selector, without any dots
 	 * @memberof DasUiHandler
@@ -463,7 +490,7 @@ class DasUiHandler {
 	
 	/**
 	 *
-	 * @summary Analyze a Dom Element to set a new @AspectDefinition from it
+	 * Analyze a Dom Element to set a new @AspectDefinition from it
 	 * @param {DomElement} domElement Dom Element to anlayze attributes to create new aspect from
 	 * @return {AspectDefinition}  New Aspect Definition
 	 * @memberof DasUiHandler
@@ -478,7 +505,7 @@ class DasUiHandler {
 		let kind = formula ? EnumAspectKind.Formula : 
 					(reference ? EnumAspectKind.Reference : EnumAspectKind.Direct);
 		let attrDef = new AspectDefinition(key, kind, formula ?? reference);
-		attrDef.defaultValue = domElement.value;
+		attrDef.defaultValue = this.getValue(domElement);
 		
 		// optional attributes setup
 		if (domElement.hasAttribute(this.attrs.dataType)) {
@@ -492,19 +519,20 @@ class DasUiHandler {
 	}
 
 	/**
-	 * @summary Get info from a Dom Element into a @AspectModifiedInfo instance
+	 * Get info from a Dom Element into a @AspectModifiedInfo instance
 	 * @param {DomElement} element
+	 * @param {Object} overrideObject - Optional Only used when overriding properties. useValue and value must be set to be used.
 	 * @return {AspectModifiedInfo} 
 	 * @memberof DasUiHandler
 	 */
-	#getModifiedInfo(element) {	
+	#getModifiedInfo(element, overrideObject) {	
 		if (element.hasAttribute(this.attrs.fieldFormula)) {
 			return null; // no ui change from formula
 		}
 		let key = element.getAttribute(this.attrs.fieldKey);
-		let value = element.value;
-		if (element.type == 'checkbox') {
-			value = element.checked ? 1 : 0;
+		let value = this.getValue(element);
+		if (overrideObject && overrideObject.useValue) {
+			value = overrideObject.value;
 		}
 		
 		if (element.hasAttribute(this.attrs.lineName)) {
@@ -518,7 +546,7 @@ class DasUiHandler {
 	}
 
 	/**
-		* @summary Adds a new line to a Line container
+		* Adds a new line to a Line container
 		* @param {DomElement} button Dom button element used to Add a new Line
 		* @memberof DasUiHandler
 		*/
@@ -539,7 +567,7 @@ class DasUiHandler {
 
 	
 	/**
-	 * @summary add a line in the Dom for a Line container
+	 * Add a line in the Dom for a Line container
 	 * @param {string} lineName LineElement name associated with line
 	 * @param {string} newLineID New Line ID for this line
 	 * @param {string?} [filterName] Associated filter name. When present, will add for a FilterLine instead of a line
@@ -548,10 +576,14 @@ class DasUiHandler {
 	addNewDomLine(lineName, newLineID, filterName) {
 		let queryTemplate = filterName ? `${this.selects.root} ${this.selects.lineFilterTemplate}[${this.attrs.fieldKey}='${filterName}']`
 												: `${this.selects.root} ${this.selects.lineDefinition}[${this.attrs.lineName}='${lineName}']`;
-		let queryContainer = filterName ? `${this.selects.root} ${this.selects.lineFilter}[${this.attrs.fieldKey}='${filterName}']`
+		let queryContainer = filterName ? `${this.selects.root} ${this.selects.lineFilterDefinition}[${this.attrs.fieldKey}='${filterName}']`
 												: `${this.selects.root} ${this.selects.lineContainer}[${this.attrs.lineName}='${lineName}']`;
 
 		let nodeTemplate = document.querySelector(queryTemplate);
+		if (!nodeTemplate) {
+			console.error("Cannot Add line. Template not found :" + queryTemplate);
+			return;
+		}
 		let clone = nodeTemplate.content.cloneNode(true).firstElementChild;
 
 		// set line info
@@ -577,11 +609,22 @@ class DasUiHandler {
 		}
 
 		let target = document.querySelector(queryContainer);
+		if (!target) {
+			console.error("Cannot Add line. Container not found :" + queryContainer);
+			return;
+		}
 		target.appendChild(clone);
+		//console.log(`Added line - Filter:${filterName}, line:${lineName}, Line ID: ${newLineID}`)
+
+		let fieldElementsInLine = clone.querySelectorAll(this.selects.display);
+		for (let field of fieldElementsInLine) {
+			let key = field.getAttribute(this.attrs.fieldKey);
+			this.#_dakairAspectSystem.resend(key);
+		}
 	}
 
 	/**
-	 * @summary Adjust the Add button of a line for new line index
+	 * Adjust the Add button of a line for new line index
 	 * @param {string} lineName LineElement name
 	 * @param {int} addedLineID line identifier
 	 * @memberof DasUiHandler
@@ -589,13 +632,22 @@ class DasUiHandler {
 	adjustNewLineButton(lineName, addedLineID) {
 		let target = document.querySelector(`${this.selects.root} ${this.selects.lineAdd}[${this.attrs.lineName}='${lineName}']`);
 		if (target) {
-			target.setAttribute(this.attrs.lineID, addedLineID + 1);
+			target.setAttribute(this.attrs.lineID, this.getNewLineID(addedLineID));
 		}
-		
+	}
+	
+	getNewLineID(lineID) {
+		let currentID = 0;
+		try {
+			currentID = parseInt(lineID);
+		} catch {
+			currentID = -1;
+		}
+		return currentID + 1;
 	}
 
 	/**
-	 * @summary Delete a Line form the DOM
+	 * Delete a Line form the DOM
 	 * @param {string} lineName LineElement name
 	 * @param {string} lineID Line identifier
 	 * @param {string?} [filterName] Associated Line Filter Name. change behavior for a fitler line instead of standard line.
@@ -603,8 +655,8 @@ class DasUiHandler {
 	 * @memberof DasUiHandler
 	 */
 	deleteDomLine(lineName, lineID, filterName) {
-		let query = filterName ? `${this.selects.root} ${this.selects.lineParent}[${this.attrs.lineName}='${lineName}'][${this.attrs.lineID}='${lineID}']`
-							: `${this.selects.root} ${this.selects.lineFilter}[${this.attrs.fieldKey}='${filterName}' ${this.selects.lineParent}[${this.attrs.lineName}='${lineName}'][${this.attrs.lineID}='${lineID}']`;
+		let query = filterName ? `${this.selects.root} ${this.selects.lineFilterDefinition}[${this.attrs.fieldKey}='${filterName}'] ${this.selects.lineParent}[${this.attrs.lineName}='${lineName}'][${this.attrs.lineID}='${lineID}']`
+				: `${this.selects.root} ${this.selects.lineParent}[${this.attrs.lineName}='${lineName}'][${this.attrs.lineID}='${lineID}']`;
 		let lineParent = document.querySelectorAll(query);
 		if (!lineParent) {
 			console.error(`Could not find line '${lineID}' for element '${lineName}'`);
@@ -616,23 +668,94 @@ class DasUiHandler {
 	}
 
 	/**
-		* @summary callback when DOM Element value changed. Sets value in @AspectSystemManager
+		* Callback when DOM Element value changed. Sets value in @AspectSystemManager
 		* @param {DomElement} element
 		* @memberof DasUiHandler
 		*/
-	onElementValueChange(element) {
+	onElementValueChange(element, overrideObject) {
 		// handles HTML input changes and send them to value-handler js
 		console.log("onElementValueChange called");
 		if (!this.doCallback) {
 			return;
 		}
-		let modifiedAspect = this.#getModifiedInfo(element);
+		DasUiHandler.#patchRadioChangeEvent(element);
+		this.sendAspectChange(this.#getModifiedInfo(element, overrideObject));
+	}
+
+	/**
+	 * Send to Das a change to an aspect.
+	 * @param {AspectModifiedInfo} modifiedAspect
+	 * @memberof DasUiHandler
+	 */
+	sendAspectChange(modifiedAspect) {
 		this.#_dakairAspectSystem.setValue(modifiedAspect);
+	}
+
+	/**
+	 * Return DomElement info from a line
+	 * @param {string} id
+	 * @returns {DomLineInfo[]} Array of all the lines and property under a parent container
+	 * @memberof DasUiHandler
+	 */
+	getDomLineInfoFromContainer(id) {
+		let container = document.getElementById(id);
+		if (!container) {
+			console.error(`can't find container '${id}'. Cannot get line info.`);
+		}
+		let containerLines = container.querySelectorAll('.line-parent');
+		let result = Array();
+
+    for(let containerLine of containerLines) {
+			let lineID = containerLine.getAttribute(this.attrs.lineID);
+			let lineName = containerLine.getAttribute(this.attrs.lineName);
+      let line = new DomLineInfo(containerLine, lineName, lineID);
+			result.push(line);
+			this.#setDomLineProperties(line, containerLine.querySelectorAll(this.selects.lineField));
+			this.#setDomLineProperties(line, containerLine.querySelectorAll(this.selects.lineDisplay));
+    }
+		return result;
+	}
+
+	getDomElementFromRefKey(key, lineName, lineID) {
+		let element = 
+		lineName ? document.querySelector(`${this.selects.root} ${this.selects.lineParent}[${this.attrs.lineName}='${lineName}'] ${this.selects.lineField}[${this.attrs.lineID}='${lineID}'][${this.attrs.fieldKey}='${key}']`)
+			: document.querySelector(`${this.selects.root} ${this.selects.field}[${this.attrs.fieldKey}='${key}']`);
+		if (! element) {
+			console.warn(`Could not find element for ${key}`);
+			return null;
+		}
+		return element;
+	}
+
+	getDomValueFromRefKey(key, lineName, lineID) {
+		let element = this.getDomElementFromRefKey(key, lineName, lineID);
+		if (element) {
+			return DasUiHandler.getElementValue(element);
+		}
+		console.warn(`Could not find value, because could not find element for ${key}, line (optional):${lineName}, ${lineID}`);
+		return '';
+	}
+
+	/**
+	 * Sets fields properties of DomLineInfo from a list of fields
+	 * @param {DomLineInfo} line
+	 * @param {NodeListOf<Element>} allLineFields
+	 * @memberof DasUiHandler
+	 */
+	#setDomLineProperties(line, allLineFields) {
+		for(let lineField of allLineFields) {
+			let refKey = lineField.getAttribute(this.attrs.fieldKey);
+			let value = this.getValue(lineField);
+			let fieldInfo = new DomLineProperty(line, lineField, refKey, value);
+			if (!line.properties.has(refKey)) {
+				line.properties.set(refKey, fieldInfo);
+			}
+		}
 	}
 	
 	/**
-	 * @summary callback when Dakair Aspect System reported a value change
-	 * @param {modifiedAspect} aspectModified Modified Aspect information
+	 * Callback when Dakair Aspect System reported a value change
+	 * @param {AspectModifiedInfo} aspectModified Modified Aspect information
 	 * @memberof DasUiHandler
 	 */
 	onAspectValueChange(aspectModified) {
@@ -647,10 +770,13 @@ class DasUiHandler {
 				case 'delete':
 					this.deleteDomLine(aspectModified.name, aspectModified.lineID);
 					break;
+				case 'filter':
+					setTimeout(() => {this.#_lineFiltering.validateChange(this, aspectModified)}, 100);
+					break;
 				default:
 					console.error(`onAspectValueChange : Received unexpected lineOperation : '${aspectModified.lineOperation}' `);
 			}
-			this.#_lineFiltering.validateChange(this, aspectModified);
+			this.#_doCallback = true;
 			return;
 		}
 		let newValue = aspectModified.value;
@@ -660,37 +786,117 @@ class DasUiHandler {
 		let allEls = document.querySelectorAll(query);
 		//console.log("onAspectValueChange. query=" + query + ", newValue=" + newValue);
 		for(let el of allEls) {
-			this.#changeValue(el, newValue);
+			this.changeValue(el, newValue);
 		}
 		//now, the display fields only
 		query = aspectModified.lineID ? `${this.selects.root} ${this.selects.lineDisplay}[${this.attrs.lineName}='${aspectModified.name}'][${this.attrs.lineID}='${aspectModified.lineID}'][${this.attrs.fieldKey}='${aspectModified.property}']`
 						    : `${this.selects.root} ${this.selects.display}[${this.attrs.fieldKey}='${aspectModified.name}']`;
 		allEls = document.querySelectorAll(query);
 		for(let el of allEls) {
-			this.#changeValue(el, newValue);
+			this.changeValue(el, newValue);
 		}
-		this.#_lineFiltering.validateChange(this, aspectModified);
 		this.#_doCallback = true;
 	}
 
 	/**
-	 * @summary change value of a DOM element. The value can be inner text, an attribute or an input value.
+	 * Change value of a DOM element. The value can be inner text, an attribute or an input value.
 	 * @param {DomElement} element
 	 * @param {string} newValue
 	 * @memberof DasUiHandler
 	 */
-	#changeValue(element, newValue) {
+	changeValue(element, newValue) {
 		if (element.hasAttribute(this.#_dasAttributes.valueDestination)) {
 			let targetAttribute = element.getAttribute(this.#_dasAttributes.valueDestination);
 			element.setAttribute(targetAttribute, newValue);
-		} else if (element.nodeName == 'INPUT' || element.nodeName == 'SELECT') {
-			if (element.type == 'checkbox') {
+		} else {
+			DasUiHandler.setElementValue(element, newValue);
+		}
+		if (element.hasAttribute(this.#_dasAttributes.fnValueChange)) {
+			let fnName = element.getAttribute(this.#_dasAttributes.fnValueChange)
+			if (!window[fnName]) {
+				console.warn(`Function ${fnName} set in ${this.#_dasAttributes.fnValueChange}, but is not defined under window object. can't call.`)
+			} else {
+				setTimeout(() => {window[fnName](element, newValue);}, 100); // handled outside DAS value events
+			}
+		}
+	}
+
+	/**  
+	 * Get value of a Dom element
+	 * @param {DomElement} element Dom node to extract value from
+	 * @return {number|string} Dom element value from value attribute, or 1 for checkbox checked, or option selected from select. Else, textContent.
+	*/
+	getValue(element) {
+		if (element.hasAttribute(this.#_dasAttributes.valueDestination)) {
+			let targetAttribute = element.getAttribute(this.#_dasAttributes.valueDestination);
+			return element.getAttribute(targetAttribute);
+		} else {
+			return DasUiHandler.getElementValue(element);
+		}
+	}
+
+	/**
+	 * Set Html Element value to the right place.
+	 * @param {Element} element 
+	 * @param {string|number} newValue value to assign
+	 */
+	static setElementValue(element, newValue) {
+		if (element.nodeName == 'INPUT' || element.nodeName == 'SELECT') {
+			if (element.type == 'checkbox' || element.type == 'radio') {
 				element.checked = (newValue == 1);
 			} else {
 				element.value  = newValue;
 			}
 		} else {
-			element.textContent = newValue;
+			if (!element.firstChild) {
+				element.appendChild(document.createTextNode(''));
+			} else if ( element.firstChild.nodeName != '#text') {
+				element.insertBefore(document.createTextNode(''), element.firstChild);
+			}
+			element.firstChild.textContent = newValue;
+		}
+	}
+
+	/**
+	 * Get Html Element value from the right place. Returns 1 for checked, 0 for unchecked.
+	 * @param {Element} element 
+	 * @returns {string|number} value
+	 */
+	static getElementValue(element) {
+		if (element.nodeName == 'INPUT' || element.nodeName == 'SELECT') {
+			if (element.type == 'checkbox' || element.type == 'radio') {
+				return element.checked ? 1 : 0;
+			} else {
+				return element.value;
+			}
+		} else {
+			if (element.firstChild && element.firstChild.nodeName == '#text') {
+				return element.firstChild.textContent;
+			}
+			return element.textContent;
+		}
+	}
+
+	// since radio do not fire the change when they are unchecked, have to do it manually.
+	// when one radio triggers, it triggers all radio of the same name.
+	// to avoid eternal loop, they do not fire other events until removed from the list
+	static #radioPatchList = []
+
+	static #patchRadioChangeEvent(element) {
+		if (element.type != 'radio') return;
+		if (this.#radioPatchList.includes(element)) {
+			this.#radioPatchList.splice(this.#radioPatchList.indexOf(element));
+			return;
+		}
+		if (element.name) {
+			let allRadioOfNames = document.querySelectorAll(`input[name='${element.name}']`);
+			var evt = new Event('change');
+			for (let singleRadio of allRadioOfNames) {
+				if (singleRadio != element) {
+					this.#radioPatchList.push(singleRadio);
+					singleRadio.dispatchEvent(evt);
+				}
+			}
 		}
 	}
 
