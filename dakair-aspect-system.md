@@ -40,8 +40,8 @@ Here is the TLDR; code to use the system. The symbol [...] means any of your cod
 <body>
   [...] - Should include the template, else nothing will happen
   <script>
-    var casHandler = new CasUiHandler();
-	casHandler.initialize();
+    var dasHandler = new DasUiHandler();
+	  dasHandler.initialize();
   </script>
 </body>
 ```
@@ -59,12 +59,12 @@ This simple template creates 2 fields. A user input field and a formula based on
 ```
 
 ## How does it work
-The DAS system is divided in 2 parts, ui and the DAS. The ui handler is not mandatory and can be replaced with custom code. This section presume the usage of the unmodifier CasUiHandler class.
+The DAS system is divided in 2 parts, ui and the DAS. The ui handler is not mandatory and can be replaced with custom code. This section presume the usage of the unmodifier DasUiHandler class.
 
-In the script, when CasUiHandler is initialized, it parse the document for the css selectors of the different fields and container it supports. Current value of elements is treated as default-value, unless overidden. It then sends the aspects to the DAS system, and DAS recalculate any other aspects that are impacted and send new calculated values back.
+In the script, when DasUiHandler is initialized, it parse the document for the css selectors of the different fields and container it supports. Current value of elements is treated as default-value, unless overidden. It then sends the aspects to the DAS system, and DAS recalculate any other aspects that are impacted and send new calculated values back.
 
 ## Aspect Definition
-This section suppose the usage of the default selectors and DOM attributes, as defined in custom-aspect-system-ui.js, classes CasSelectors and CasAttributes. See next section to customize.
+This section suppose the usage of the default selectors and DOM attributes, as defined in custom-aspect-system-ui.js, classes DasSelectors and DasAttributes. See next section to customize.
 
 ## Optional Dom Attributes 
 
@@ -74,8 +74,8 @@ Those dom attributes can be set on any aspect and are not mandatory
 
 | | Dom attribute | Explanation |
 | ---|----------| -----|
-| | data-default-value | Override the value of the eleemnt as the default value for this element |
-| | data-type | Default is  ?. Can be int, float, text. It is evaluated from the default-value when left at ?. Really useful for aspects used in aggregate function, as 1+3=12 is not what you expect from a sum of values. |
+| | data-default-value | Override the value of the element as the default value for this element |
+| | data-type | Default is  ?. Can be int, float, text. It is evaluated from the default-value when left at ?. Really useful for aspects used in aggregate function, as 1+3=13 is not what you expect from a sum of values. |
 
 
 
@@ -120,7 +120,7 @@ It defines the parent element, the line name used and each of the aspects that i
 | tag | template |
 | class | "line-definition" |
 | attributes | data-line-name="lineName" |
-| special | Whole definition should have a parent element (any div will do) inside the tag|
+| special | Whole definition should have a single parent element (any div will do) inside the tag|
 | example | See [complete line example](#line-example) |
 
 #### **Line Properties**
@@ -168,7 +168,7 @@ Special functions and their parameters
 | --- | --- |
 |lineMap| The line aspect name, will get the internal Map reference|
 |propertyName| The line property name. Used to calculate the value|
-|operation| Optional. Default to sum. can be sum,mean,count|
+|operation| Optional. Default to sum. can be sum,mean,count,min,max|
 |propNameCond| Optional. **Property name** used to do conditional check for aggregation. <br /> If included, is paired with next parameter to establish condition.|
 |propValueCond| Optional. **Property value** used to do conditional check for aggregation. |
 |||
@@ -217,24 +217,24 @@ The clean way to change the attributes and selectors is to instanciate them and 
 Use the constructor of the DAS to use your own instances instead of default ones.
 
 Warnings:
-- CasSelectors.lineParent : Must be a single attribute, as it is assigned by replacing the dot.
-- CasSelectors.templateDefinition : Value is used in a not condition when looking for non-line fields.
+- DasSelectors.lineParent : Must be a single attribute, as it is assigned by replacing the dot.
+- DasSelectors.templateDefinition : Value is used in a not condition when looking for non-line fields.
 
 example :
 ```
   <script>
-    let mySelectors = new CasSelectors();
+    let mySelectors = new DasSelectors();
     mySelectors.field = '.das-field';
-    let myAttributes = new CasAttributes();
+    let myAttributes = new DasAttributes();
     myAttributes.fieldKey = 'data-das-key';
-    var casHandler = new CasUiHandler(mySelectors, myAttributes);
-	casHandler.initialize();
+    var dasHandler = new DasUiHandler(mySelectors, myAttributes);
+	  dasHandler.initialize();
   </script>
 ```
 
 ## Copyrights
 
-- CustomAtributeSystem has been developped by Rethdakair is is given freely to use anyhow and anywhere you want, without any liability from my side.
+- Dakair Aspect System has been developped by Rethdakair is is given freely to use anyhow and anywhere you want, without any liability from my side.
 - DAS is not linked in any way to math.js, nor the authors of DAS.
 - [math.js](https://mathjs.org/) is open source and licensed under the Apache 2.0 License.
 
